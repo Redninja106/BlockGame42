@@ -1,0 +1,13 @@
+- entity collision
+- gui
+- items?
+- switch block mask to texture
+	- infinite worlds
+		- worldgen
+			- biomes?
+- find texture art
+	- maybe 32x32 actual pictures?
+
+long term
+- serialization (rip system out of spacegame?)
+- multiplayer (woah)

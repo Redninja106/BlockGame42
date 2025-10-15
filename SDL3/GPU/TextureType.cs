@@ -1,0 +1,10 @@
+﻿namespace SDL.GPU;
+
+public enum TextureType
+{
+    _2D,
+    _2DArray,
+    _3D,
+    Cube,
+    CubeArray
+}

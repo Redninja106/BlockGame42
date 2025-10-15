@@ -1,0 +1,132 @@
+﻿using BlockGame42.Chunks;
+using BlockGame42.GUI;
+using SDL;
+using SDL.GPU;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BlockGame42.Rendering;
+
+internal class GraphicsManager
+{
+    private readonly IAssetSource assets;
+
+    public Window Window { get; }
+
+    public Device device;
+    public ShaderManager shaders;
+    public TransferBufferBatcher transferBatcher;
+    
+    public CommandBuffer CommandBuffer { get; private set; }
+    //public Texture SwapchainTexture { get; private set; }
+
+    //public Texture DepthStencilTexture { get; private set; } = null!;
+    //public uint BackBufferTextureWidth { get; private set; }
+    //public uint BackBufferTextureHeight { get; private set; }
+
+    //public Texture TexelIDTexture { get; private set; } = null!;
+    //public uint TexelIDTextureWidth { get; private set; }
+    //public uint TexelIDTextureHeight { get; private set; }
+
+    private ComputePipeline zeroBufferPipeline;
+
+    //public Texture PositionTexture { get; private set; } = null!;
+
+    public RenderTargetManager RenderTargets { get; }
+
+    public GraphicsManager(Window window, IAssetSource assets)
+    {
+        this.Window = window;
+        this.assets = assets;
+        this.device = new Device(ShaderFormat.DXIL, true);
+        device.ClaimWindow(window);
+        device.SetSwapchainParameters(window, SwapchainComposition.SDR, PresentMode.Immediate);
+
+        shaders = new(device, assets);
+
+        transferBatcher = new(device, 64 * 1024 * 1024);
+
+        CommandBuffer = null!;
+
+        // BlockMeshRenderer = new(this);
+        // ChunkRenderer = new(this);
+        // GUIRenderer = new(this);
+        // OverlayRenderer = new(this);
+
+        zeroBufferPipeline = shaders.GetComputePipeline("zero_buffer");
+
+        RenderTargets = new(device);
+    }
+
+    public void AcquireCommandBuffer()
+    {
+        CommandBuffer = device.AcquireCommandBuffer();
+    }
+
+    public bool BeginFrame()
+    {
+        return RenderTargets.AcquireSwapchainTexture(CommandBuffer, Window);
+    }
+
+    public void EndFrame()
+    {
+        this.RenderTargets.SwapchainTexture = null!;
+        CommandBuffer.Submit();
+    }
+
+    public TextureData LoadTextureData(string assetName)
+    {
+        TextureData result = default;
+        byte[] data = assets.Load(assetName + ".texture");
+        result.Width = MemoryMarshal.Read<int>(data.AsSpan(0..4));
+        result.Height = MemoryMarshal.Read<int>(data.AsSpan(4..8));
+        result.Data = data[8..];
+        return result;
+    }
+
+    public Texture LoadTexture(string assetName)
+    {
+        return CreateTexture(LoadTextureData(assetName));
+    }
+
+    public Texture CreateTexture(TextureData data)
+    {
+        Texture texture = device.CreateTexture(new()
+        {
+            Type = TextureType._2D,
+            Format = TextureFormat.R8G8B8A8_UNorm,
+            Usage = TextureUsageFlags.Sampler | TextureUsageFlags.ColorTarget,
+            Width = (uint)data.Width,
+            Height = (uint)data.Height,
+            LayerCountOrDepth = 1,
+            NumLevels = 5,
+            SampleCount = SampleCount._1,
+        });
+
+        TextureRegion region = new()
+        {
+            Texture = texture,
+            W = (uint)data.Width,
+            H = (uint)data.Height,
+            D = 1,
+        };
+
+        transferBatcher.UploadToTexture(data.Data, (uint)data.Width, (uint)data.Height, region, false);
+
+        return texture;
+    }
+
+    public void ClearDataBuffer(DataBuffer buffer, bool cycle)
+    {
+        const int bytesPerGroup = (16 * 64);
+        ComputePass pass = CommandBuffer.BeginComputePass([], [new StorageBufferReadWriteBinding(buffer, cycle)]);
+        pass.BindPipeline(zeroBufferPipeline);
+        pass.Dispatch((buffer.Size + bytesPerGroup - 1) / bytesPerGroup, 1, 1);
+        pass.End();
+    }
+
+}

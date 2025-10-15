@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "BlockGame42": {
+      "commandName": "Project",
+      "nativeDebugging": false
+    }
+  }
+}

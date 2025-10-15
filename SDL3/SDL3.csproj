@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>SDL</RootNamespace>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="bottlenoselabs.SDL.Interop" Version="2025.8.2" />
+    <PackageReference Include="bottlenoselabs.SDL_image.Interop" Version="2025.8.2" />
+    <PackageReference Include="bottlenoselabs.SDL_ttf.Interop" Version="2025.8.2" />
+  </ItemGroup>
+	
+  <ItemGroup>
+	<PackageReference Include="bottlenoselabs.SDL.Native.win-x64" Version="2025.8.2" />
+	<PackageReference Include="bottlenoselabs.SDL_image.Native.win-x64" Version="2025.8.2" />
+	<PackageReference Include="bottlenoselabs.SDL_ttf.Native.win-x64" Version="2025.8.2" />
+  </ItemGroup>
+
+</Project>

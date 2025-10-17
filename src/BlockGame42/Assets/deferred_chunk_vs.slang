@@ -8,7 +8,7 @@ struct Face
     float2 lightmap_uv; // 2x8 16
 
     uint texid;         // 11  11
-    float4 ao;          // 4   4
+    float reflective;
 }
 
 struct VsOut

@@ -147,6 +147,7 @@ class Game : Application
         if (graphics.BeginFrame())
         {
             gameRenderer.Render();
+            gameRenderer.OverlayRenderer.PushBox(new(new(-64, 0, -64), new(64, 64, 64)), 0xFF343434);
             graphics.EndFrame();
         }
 

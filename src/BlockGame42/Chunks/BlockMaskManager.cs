@@ -10,10 +10,13 @@ namespace BlockGame42.Chunks;
 internal class BlockMaskManager
 {
     private readonly GraphicsManager graphics;
-    private readonly DataBuffer blockMaskBuffer;
+    // private readonly DataBuffer blockMaskBuffer;
+    private readonly Texture blockMaskTexture;
     private readonly ComputePipeline copyPipeline;
     private readonly TransferBuffer blockMaskUploadBuffer;
     private int width, height, depth;
+    
+    public Coordinates ChunkOffset { get; private set; }
 
     public BlockMaskManager(GraphicsManager graphics, int width, int height, int depth)
     {
@@ -21,22 +24,40 @@ internal class BlockMaskManager
         this.width = width;
         this.height = height;
         this.depth = depth;
+        ChunkOffset = new(width / (Chunk.Width * 2), 0, depth / (Chunk.Depth * 2));
 
-        blockMaskBuffer = graphics.device.CreateDataBuffer(
-            DataBufferUsageFlags.ComputeStorageWrite | DataBufferUsageFlags.GraphicsStorageRead,
-            (uint)(width * height * depth)
-            );
+        //blockMaskBuffer = graphics.device.CreateDataBuffer(
+        //    DataBufferUsageFlags.ComputeStorageWrite | DataBufferUsageFlags.GraphicsStorageRead,
+        //    (uint)(width * height * depth)
+        //    );
+
+        blockMaskTexture = graphics.device.CreateTexture(new()
+        {
+            Type = TextureType._3D,
+            Format = TextureFormat.R8_UInt,
+            Usage = TextureUsageFlags.ComputeStorageRead | TextureUsageFlags.ComputeStorageWrite,
+            Width = (uint)width,
+            Height = (uint)height,
+            LayerCountOrDepth = (uint)depth,
+            NumLevels = 1,
+            SampleCount = SampleCount._1,
+        });
 
         blockMaskUploadBuffer = graphics.device.CreateTransferBuffer(TransferBufferUsage.Upload, Chunk.BlockCount);
+        Console.WriteLine($"Block mask is {((width * height * depth) >> 20)}MB");
 
         copyPipeline = graphics.shaders.GetComputePipeline("block_mask_copy");
     }
 
-    public DataBuffer GetBlockMaskBuffer()
-    {
-        return blockMaskBuffer;
-    }
+    //public DataBuffer GetBlockMaskBuffer()
+    //{
+    //    return blockMaskBuffer;
+    //}
 
+    public Texture GetBlockMaskTexture()
+    {
+        return blockMaskTexture;
+    }
 
     public void UpdateChunk(CommandBuffer commandBuffer, Coordinates chunkCoordinates, Chunk chunk, ChunkMesh chunkMesh)
     {
@@ -54,7 +75,7 @@ internal class BlockMaskManager
         //    }
         //}
         blockMaskUploadBuffer.Unmap();
-        
+
         // copy into chunkmesh's buffer
         CopyPass copyPass = commandBuffer.BeginCopyPass();
         TransferBufferLocation src = new(blockMaskUploadBuffer);
@@ -63,10 +84,10 @@ internal class BlockMaskManager
         copyPass.End();
 
         // copy into world
-        ComputePass computePass = commandBuffer.BeginComputePass([], [new(blockMaskBuffer, false)]);
+        ComputePass computePass = commandBuffer.BeginComputePass([new(blockMaskTexture, 0, 0, false)], []);
         WorldBlockMaskInfo worldMaskInfo = new()
         {
-            position = (chunkCoordinates + new Coordinates(2, 0, 2)) * Chunk.Size,
+            position = (chunkCoordinates + this.ChunkOffset) * Chunk.Size,
             size = new(width, height, depth),
         };
         commandBuffer.PushComputeUniformData(0, ref worldMaskInfo);

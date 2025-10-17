@@ -13,11 +13,12 @@ SDL_CS_RW_RESOURCE(0, RWStructuredBuffer<TileRecord> tileLookup);
 SDL_CS_RESOURCE(0, Texture2D<unorm float4> positionTarget);
 SDL_CS_RESOURCE(1, Texture2D<unorm float4> normalTarget);
 SDL_CS_RESOURCE(2, Texture2D<uint> idTarget);
-SDL_CS_RESOURCE(3, ByteAddressBuffer blockMasks);
+SDL_CS_RESOURCE(3, Texture3D<uint> blockMasks);
 
 SDL_CS_UNIFORM_BUFFER(0, uint lookupSize);
 SDL_CS_UNIFORM_BUFFER(1, uint ticks);
 SDL_CS_UNIFORM_BUFFER(2, float4 sundir);
+SDL_CS_UNIFORM_BUFFER(3, int3 blockMasksOffset);
 
 static Random random;
 
@@ -94,56 +95,49 @@ float3 ray_color(Ray ray)
 {
     const int MaxBounces = 4;
 
+    float hitT;
+    float3 hitNormal;
+    int3 hitVoxel;
+
     float3 transmission[MaxBounces];
     float3 emission[MaxBounces];
 
     for (int i = 0; i < MaxBounces; i++)
     {
-        float hitT;
-        float3 hitNormal;
-        int3 hitVoxel;
-        bool hit = raycast(ray, hitT, hitNormal, hitVoxel);
-        if (hit)
+        transmission[i] = 0;
+        emission[i] = 0;
+
+        // sun emission!
         {
+
+            const float sunfuzz = 0.01;
+            const float sunstrength = .75;
+
+            Ray sunRay;
+            sunRay.origin = ray.origin;
+            sunRay.direction = normalize(sundir.xyz + sunfuzz * random.NextUnitVector());
+            sunRay.inverseDirection = 1.0 / ray.direction;
+            sunRay.length = ray.length;
+
             emission[i] = float3(0, 0, 0);
+            if (!raycast(sunRay, hitT, hitNormal, hitVoxel))
+            {
+                float sunbrightness = dot(sunRay.direction, sundir.xyz);
+                emission[i] += float3(sunstrength * max(0, sunbrightness));
+            }
+        }
+
+        if (raycast(ray, hitT, hitNormal, hitVoxel))
+        {
             transmission[i] = float3(.5, .5, .5);
 
             ray.origin = ray.at(hitT) + hitNormal * 0.001;
             ray.direction = normalize(hitNormal + random.NextUnitVector());
             ray.inverseDirection = 1 / ray.direction;
-
-            const float sunfuzz = 0.01;
-            const float sunstrength = .75;
-
-            ray.direction = normalize(sundir.xyz + sunfuzz * random.NextUnitVector());
-            ray.inverseDirection = 1.0 / ray.direction;
-
-            if (!raycast(ray, hitT, hitNormal, hitVoxel))
-            {
-                float sunbrightness = dot(ray.direction, sundir.xyz);
-                emission[i] += float3(sunstrength * max(0, sunbrightness));
-            }
         }
-
-        const float sunfuzz = 0.01;
-        const float sunstrength = .75;
-
-        // sun emission!
-        ray.direction = normalize(sundir.xyz + sunfuzz * random.NextUnitVector());
-        ray.inverseDirection = 1.0 / ray.direction;
-
-        emission[i] = float3(0, 0, 0);
-        if (!raycast(ray, hitT, hitNormal, hitVoxel))
-        {
-            float sunbrightness = dot(ray.direction, sundir.xyz);
-            emission[i] += float3(sunstrength * max(0, sunbrightness));
-        }
-
-        if (!hit)
+        else
         {
             const float skystrength = .25;
-
-            transmission[i] = float3(0, 0, 0);
 
             // sky emission
             emission[i] += float3(skystrength); // + 0.5 * float3(.392f, .584f, .929f);
@@ -157,16 +151,6 @@ float3 ray_color(Ray ray)
         color = color * transmission[j] + emission[j];
     }
     return color;
-}
-
-uint ReadVoxelByte(int3 pos)
-{
-    uint offset = pos.y * 128 * 128 + pos.z * 128 + pos.x; // 1 byte per voxel
-
-    // Load 32-bit word and extract byte
-    uint word = blockMasks.Load(offset & ~0b11); // align to 4 bytes
-    uint byteIndex = offset & 0b11;              // which byte in the word
-    return (word >> (byteIndex * 8)) & 0xFF;
 }
 
 struct Box
@@ -240,7 +224,7 @@ bool BoxRaycast(Box box, Ray ray, out float t, out float3 normal)
 
 bool raycast(Ray ray, out float t, out float3 normal, out int3 voxel)
 {
-    voxel = int3(floor(ray.origin)) + int3(2 * 32, 0, 2 * 32);
+    voxel = int3(floor(ray.origin)) + blockMasksOffset;
     int3 step = int3(sign(ray.direction));
 
     if (all(step == 0))
@@ -264,7 +248,7 @@ bool raycast(Ray ray, out float t, out float3 normal, out int3 voxel)
     int steps = 100;
     while (bool(--steps))
     {
-        int byte = ReadVoxelByte(int3(voxel));
+        int byte = blockMasks.Load(int4(voxel, 0));
 
         if (byte == 0xFF)
         {
@@ -278,7 +262,7 @@ bool raycast(Ray ray, out float t, out float3 normal, out int3 voxel)
 
             bool hit = false;
             Ray localRay = ray;
-            localRay.origin -= voxel - int3(2 * 32, 0, 2 * 32);
+            localRay.origin -= voxel - blockMasksOffset;
             for (int i = 0; i < 8; i++)
             {
                 if (((byte >> i) & 1) == 1)
@@ -287,7 +271,7 @@ bool raycast(Ray ray, out float t, out float3 normal, out int3 voxel)
                     float3 boxNormal;
                     if (BoxRaycast(boxes[i], localRay, boxT, boxNormal))
                     {
-                        if (boxT <= t)
+                        if (boxT > 0 && boxT <= t)
                         {
                             hit = true;
                             t = boxT;

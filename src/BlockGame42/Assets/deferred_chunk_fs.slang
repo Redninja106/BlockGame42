@@ -25,6 +25,7 @@ float linearize_depth(float d, float zNear = 0.1, float zFar = 1000)
 
 float getres(float d)
 {
+    return 16;
     if (d < 16) return 16;
     if (d < 32) return 8;
     if (d < 128) return 4;

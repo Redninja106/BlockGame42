@@ -16,7 +16,6 @@ internal class ChunkRenderer
     //private readonly GraphicsPipeline depthOnlyChunkPipeline;
     private readonly Sampler sampler;
     // private BlockTextureManager blockTextures;
-    private readonly DataBuffer blockMaskVolumeBuffer;
     private readonly TransferBuffer blockMaskVolumeTransferBuffer;
     private readonly BlockMaskManager blockMaskManager;
     
@@ -249,14 +248,11 @@ internal class ChunkRenderer
         StorageBufferReadWriteBinding tileLookupBinding = new(tileLookup, false);
         var giPass = graphics.CommandBuffer.BeginComputePass([], [tileLookupBinding]);
 
-        giPass.BindStorageBuffers(0, [
-            blockMaskManager.GetBlockMaskBuffer()
-            ]);
-
         giPass.BindStorageTextures(0, [
             graphics.RenderTargets.PositionTexture, 
             graphics.RenderTargets.NormalTexture, 
-            graphics.RenderTargets.TexelIDTexture
+            graphics.RenderTargets.TexelIDTexture,
+            blockMaskManager.GetBlockMaskTexture(),
             ]);
         giPass.BindPipeline(raymarchedGIPipeline);
 
@@ -268,6 +264,9 @@ internal class ChunkRenderer
 
         Vector4 sundir = this.sundir;
         graphics.CommandBuffer.PushComputeUniformData(2, ref sundir);
+
+        Coordinates blockMaskOffset = Chunk.Size * blockMaskManager.ChunkOffset;
+        graphics.CommandBuffer.PushComputeUniformData(3, ref blockMaskOffset);
 
         giPass.Dispatch((graphics.RenderTargets.Width + 15) / 16, (graphics.RenderTargets.Height + 15) / 16, 1);
 
@@ -306,22 +305,6 @@ internal class ChunkRenderer
         public Matrix4x4 transform;
         public uint id;
     }
-
-    Coordinates blockMasksOffset = new(2, 0, 2);
-    private void UpdateBlockMask(CopyPass copyPass, Coordinates chunkCoordinates, Chunk chunk)
-    {
-        Span<byte> blockMasksMapped = blockMaskVolumeTransferBuffer.Map(true);
-        chunk.BlockMasks.AsSpan().CopyTo(blockMasksMapped);
-        blockMaskVolumeTransferBuffer.Unmap();
-
-        chunkCoordinates += blockMasksOffset;
-
-        int offset = chunkCoordinates.Y * 4 * 4 + chunkCoordinates.Z * 4 + chunkCoordinates.X;
-        TransferBufferLocation source = new(blockMaskVolumeTransferBuffer);
-        DataBufferRegion region = new DataBufferRegion(this.blockMaskVolumeBuffer, (uint)offset * Chunk.BlockCount, Chunk.BlockCount);
-        copyPass.UploadToDataBuffer(source, region, false);
-    }
-
 }
 
 struct ChunkVertex

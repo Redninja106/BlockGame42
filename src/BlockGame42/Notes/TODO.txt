@@ -1,10 +1,10 @@
 - entity collision
+- entity raycasting
 - gui
 - items?
-- switch block mask to texture
-	- infinite worlds
-		- worldgen
-			- biomes?
+- infinite worlds
+	- worldgen
+		- biomes?
 - find texture art
 	- maybe 32x32 actual pictures?
 

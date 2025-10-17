@@ -73,21 +73,17 @@ internal class ChunkManager
     public void LoadOrCreateChunk(Coordinates coordinates)
     {
         Chunk chunk = new Chunk();
-        for (int y = 0; y < Chunk.Height; y++)
+        
+        for (int z = 0; z < Chunk.Depth; z++)
         {
-            for (int z = 0; z < Chunk.Depth; z++)
+            int gz = coordinates.Z * Chunk.Depth + z;
+            for (int x = 0; x < Chunk.Width; x++)
             {
-                for (int x = 0; x < Chunk.Width; x++)
+                int gx = coordinates.X * Chunk.Width + x;
+
+                for (int y = 0; y < Chunk.Height; y++)
                 {
-                    int gx = coordinates.X * Chunk.Width + x;
                     int gy = coordinates.Y * Chunk.Height + y;
-                    int gz = coordinates.Z * Chunk.Depth + z;
-
-                    static bool Occupied(float x, float y, float z)
-                    {
-                        return y < (11 + 5 * float.Sin(x * .1f) + 5 * float.Cos(z * .1f));
-                    }
-
                     chunk.Blocks[x, y, z] = Game.Blocks.Air;
                     //if (Occupied(gx, gy, gz))
                     //{
@@ -104,7 +100,8 @@ internal class ChunkManager
                                 float bitx = gx + bx * .5f + .25f;
                                 float bity = gy + by * .5f + .25f;
                                 float bitz = gz + bz * .5f + .25f;
-                                if (Occupied(bitx, bity, bitz))
+                                float h = (15 + 4 * float.Cos(bitx * 1/16f) + 4 * float.Cos(bitz * 1/16f));
+                                if (bity < h)
                                 {
                                     chunk.Blocks[x, y, z] = Game.Blocks.Stone;
                                     chunk.BlockStates[x, y, z].DynamicBlock[(by << 2) + (bz << 1) + bx] = true;

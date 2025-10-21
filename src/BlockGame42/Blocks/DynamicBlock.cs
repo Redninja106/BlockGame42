@@ -1,4 +1,6 @@
-﻿using System;
+﻿using BlockGame42.Rendering;
+using SDL.GPU;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,6 +14,6 @@ internal class DynamicBlock : Block
 
     public DynamicBlock(string texid, BlockStrength strength) : base(strength)
     {
-        Model = new DynamicBlockModel(Game.Textures.Get(texid));
+        Model = new DynamicBlockModel(Material.CreateUniform(Game.Textures.Get(texid), Game.Textures.Empty));
     }
 }

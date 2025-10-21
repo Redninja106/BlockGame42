@@ -2,8 +2,11 @@
 
 // Copies block mask data from single 32^3 chunk buffer to combined buffer
 
-SDL_CS_RESOURCE(0, ByteAddressBuffer srcBuffer);        // chunk's individual buffer
-SDL_CS_RW_RESOURCE(0, RWTexture3D<uint> destTexture);   // shared world buffer
+SDL_CS_RESOURCE(0, ByteAddressBuffer maskBuffer);           // individual chunk mask buffer
+SDL_CS_RW_RESOURCE(0, RWTexture3D<uint64_t> maskTexture);   // shared world mask texture
+
+SDL_CS_RESOURCE(1, ByteAddressBuffer materialBuffer);       // individual chunk material buffer
+SDL_CS_RW_RESOURCE(1, RWTexture3D<uint> materialTexture);   // shared world material texture
 
 struct WorldBlockMaskInfo
 {
@@ -26,15 +29,20 @@ void main(uint3 threadID: SV_DispatchThreadID)
 
     uint3 destinationLocation = destination.position.xyz + threadID;
 
-    // copy 1 row (32 bytes, 8 ints)
-    [unroll]
-    for (int i = 0; i < 8; i++)
+    // copy 1 row (32 blocks, 16 uint4s)
+    for (int i = 0; i < 16; i++)
     {
-        uint blocks = srcBuffer.Load(sourceLocation + i * 4);
+        uint4 blocks = maskBuffer.Load4(sourceLocation * sizeof(uint64_t) + i * sizeof(uint4));
 
-        destTexture.Store(destinationLocation + uint3(i * 4 + 0, 0, 0), (blocks >> 0 ) & 0xFF);
-        destTexture.Store(destinationLocation + uint3(i * 4 + 1, 0, 0), (blocks >> 8 ) & 0xFF);
-        destTexture.Store(destinationLocation + uint3(i * 4 + 2, 0, 0), (blocks >> 16) & 0xFF);
-        destTexture.Store(destinationLocation + uint3(i * 4 + 3, 0, 0), (blocks >> 24) & 0xFF);
+        maskTexture.Store(destinationLocation + uint3(i * 2 + 0, 0, 0), __asuint64(blocks.xy));
+        maskTexture.Store(destinationLocation + uint3(i * 2 + 1, 0, 0), __asuint64(blocks.zw));
+    }
+
+    for (int i = 0; i < 16; i++)
+    {
+        uint materials = materialBuffer.Load(sourceLocation * 2 + i * 4);
+
+        materialTexture.Store(destinationLocation + uint3(i * 2 + 0, 0, 0), (materials >> 0) & 0xFFFF);
+        materialTexture.Store(destinationLocation + uint3(i * 2 + 1, 0, 0), (materials >> 16) & 0xFFFF);
     }
 }

@@ -43,7 +43,7 @@ internal class World
     Block nullBlock = Game.Blocks.Unloaded;
     BlockState nullBlockState;
     byte nullSupport;
-    byte nullMask;
+    ulong nullMask;
 
     public BlockReference GetBlockReference(Coordinates worldCoordinates)
     {

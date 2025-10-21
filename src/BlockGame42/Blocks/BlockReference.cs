@@ -11,9 +11,9 @@ readonly ref struct BlockReference
     public readonly ref Block Block;
     public readonly ref BlockState State;
     public readonly ref byte Support;
-    public readonly ref byte Mask;
+    public readonly ref ulong Mask;
 
-    public BlockReference(World world, Coordinates chunkCoordinates, Coordinates worldCoordinates, ref Block block, ref BlockState state, ref byte support, ref byte mask)
+    public BlockReference(World world, Coordinates chunkCoordinates, Coordinates worldCoordinates, ref Block block, ref BlockState state, ref byte support, ref ulong mask)
     {
         World = world;
         ChunkCoordinates = chunkCoordinates;

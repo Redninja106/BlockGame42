@@ -6,7 +6,6 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using BlockGame42.Blocks;
-using BlockGame42.Chunks;
 using BlockGame42.GUI;
 using BlockGame42.Rendering;
 using SDL;
@@ -31,7 +30,9 @@ class Game : Application
 
     public static float TimeStep = 1 / 20f;
 
-    public static BlockTextureManager Textures { get; private set; } = null!;
+    public static TextureIndex Textures { get; private set; } = null!;
+    public static MaterialIndex Materials { get; private set; } = null!;
+
     public static BlockRegistry Blocks { get; private set; } = null!;
 
     protected override void OnInit()
@@ -42,24 +43,7 @@ class Game : Application
         assets = new DirectoryAssetSource("Assets");
         graphics = new GraphicsManager(window, assets);
 
-        Textures = new(graphics);
-
-        CommandBuffer commandBuffer = graphics.device.AcquireCommandBuffer();
-        
-        graphics.transferBatcher.BeginBatch(commandBuffer);
-        
-        Blocks = new();
-        world = new(graphics);
-        player = new(world);
-        player.Transform.Position = new Vector3(0, 50, 0);
-        player.Transform.Rotation = Quaternion.Identity;
-        gameRenderer = new(graphics, assets, world, player);
-        
-        graphics.transferBatcher.EndBatch();
-        
-        Textures.GenerateMipmaps(commandBuffer);
-
-        commandBuffer.Submit();
+        Load();
 
         //  Textures = new(graphics);
 
@@ -114,6 +98,29 @@ class Game : Application
         //pipeline = device.CreateGraphicsPipeline(pipelineOptions);
     }
 
+    public void Load()
+    {
+        graphics.AcquireCommandBuffer();
+        //graphics.transferBatcher.BeginBatch(graphics.CommandBuffer);
+
+        Textures = new(graphics);
+        Materials = new(graphics);
+
+        Blocks = new();
+        world = new(graphics);
+        player = new(world);
+        player.Transform.Position = new Vector3(0, 50, 0);
+        player.Transform.Rotation = Quaternion.Identity;
+        gameRenderer = new(graphics, assets, world, player);
+
+        //graphics.transferBatcher.EndBatch();
+
+        Textures.GenerateMipmaps(graphics.CommandBuffer);
+
+        graphics.CommandBuffer.Submit();
+
+    }
+
     float accumulatedTickTime;
     public static float TickProgress;
 
@@ -127,7 +134,7 @@ class Game : Application
 
         accumulatedTickTime += deltaTime;
 
-        graphics.transferBatcher.BeginBatch(graphics.CommandBuffer);
+        //graphics.transferBatcher.BeginBatch(graphics.CommandBuffer);
 
         player.Update(deltaTime);
         player.Camera.Update(window.Width, window.Height);
@@ -142,7 +149,7 @@ class Game : Application
         }
 
         world.Chunks.BuildStaleChunks();
-        graphics.transferBatcher.EndBatch();
+        //graphics.transferBatcher.EndBatch();
 
         if (graphics.BeginFrame())
         {

@@ -1,1 +1,0 @@
-﻿global using static bottlenoselabs.Interop.SDL;

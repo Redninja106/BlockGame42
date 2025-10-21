@@ -10,18 +10,24 @@ using System.Threading.Tasks;
 namespace BlockGame42.Blocks;
 internal class DynamicBlockModel : BlockModel
 {
-    uint textureId;
+    Material textureSet;
     DynamicBlockMeshManager meshes;
-    public DynamicBlockModel(uint textureId)
+
+    public DynamicBlockModel(Material textureSet)
     {
-        this.textureId = textureId;
+        this.textureSet = textureSet;
         meshes = new(Game.graphics, this);
     }
 
-    public override uint GetTextureID(BlockState state, Direction direction)
+    public override Material GetMaterial(BlockState state)
     {
-        return textureId;
+        return textureSet;
     }
+
+    //public override uint GetTextureID(BlockState state, Direction direction)
+    //{
+    //    return textureId;
+    //}
 
     public override BlockFaceMask GetFaceMask(BlockState state, Direction direction)
     {
@@ -124,13 +130,16 @@ internal class DynamicBlockModel : BlockModel
 
             Direction direction = (Direction)i;
 
+            BlockFaceMask exposedFaces = ChunkMesh.FlipMaskHorizontal(this.GetFaceMask(state, ChunkMesh.directionInverses[i])) & ~this.GetFaceMask(state, direction);
+
             mesh.AppendPartialBlockFace(
-                ChunkMesh.FlipMaskHorizontal(this.GetFaceMask(state, ChunkMesh.directionInverses[i])) & ~this.GetFaceMask(state, direction),
+                exposedFaces,
                 offset.ToVector() - forward.ToVector() * .5f,
                 right.ToVector(),
                 up.ToVector(),
                 forward.ToVector(),
-                this.textureId, 1.0f
+                GetMaterial(state).Data.Transmission[direction],
+                GetMaterial(state).Data.Emission[direction]
             );
         }
 
@@ -185,6 +194,7 @@ internal class DynamicBlockModel : BlockModel
             return [new Box(Vector3.Zero, Vector3.One)];
 
         List<Box> result = [];
+        // 0bYZX
         if (state.DynamicBlock[0b000]) result.Add(new Box(new(0.0f, 0.0f, 0.0f), new(0.5f, 0.5f, 0.5f)));
         if (state.DynamicBlock[0b001]) result.Add(new Box(new(0.5f, 0.0f, 0.0f), new(1.0f, 0.5f, 0.5f)));
         if (state.DynamicBlock[0b010]) result.Add(new Box(new(0.0f, 0.0f, 0.5f), new(0.5f, 0.5f, 1.0f)));
@@ -216,9 +226,9 @@ internal class DynamicBlockModel : BlockModel
         return t != float.PositiveInfinity;
     }
 
-    public override byte GetVolumeMask(BlockState state)
+    public override ulong GetVolumeMask(BlockState state)
     {
-        return state.DynamicBlock.Mask;
+        return state.DynamicBlock.GetBlockMask64();
     }
 }
 

@@ -12,7 +12,7 @@ struct MinimizedChunkVertex
     public static readonly VertexAttribute[] Attributes = [new VertexAttribute(0, 0, VertexElementFormat.UInt2, 0)];
     public static uint Size => (uint)Unsafe.SizeOf<MinimizedChunkVertex>();
 
-    public MinimizedChunkVertex(Vector3 position, Vector2 textureCoordinates, uint blockTextureId, Vector4 ambientOcclusion, Vector3 normal)
+    public MinimizedChunkVertex(Vector3 position, Vector2 textureCoordinates, uint blockTextureId, Vector4 ambientOcclusion, Vector3 normal, uint emissiveId)
     {
         uint x = (uint)(position.X * 4) & 0b11111111;
         uint y = (uint)(position.Y * 4) & 0b11111111;
@@ -45,6 +45,7 @@ struct MinimizedChunkVertex
         ao_texid |= n_x << 15;
         ao_texid |= n_y << 13;
         ao_texid |= n_z << 11;
+        ao_texid |= emissiveId;
     }
 
 }

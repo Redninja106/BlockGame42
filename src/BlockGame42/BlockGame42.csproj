@@ -10,10 +10,6 @@
   <ItemGroup>
     <Content Include="Assets\**\*" />
   </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\SDL3\SDL3.csproj" />
-  </ItemGroup>
 	
 	<ItemGroup>
 		<UpToDateCheckInput Include="@(Content);@(None)" />
@@ -23,7 +19,11 @@
 	  <Folder Include="Notes\" />
 	</ItemGroup>
 	
+	<ItemGroup>
+	  <ProjectReference Include="..\..\..\SDL\src\SDL\SDL.csproj" />
+	</ItemGroup>
+	
   <Target Name="PostBuild" BeforeTargets="PostBuildEvent">
-    <Exec Command="&quot;.\..\..\BlockGame42.Assets.Pipeline\bin\Debug\net9.0\BlockGame42.Assets.Pipeline.exe&quot; $(ProjectDir)Assets $(OutDir)Assets" />
+    <Exec Command="&quot;$(SolutionDir)\src\BlockGame42.Assets.Pipeline\bin\Debug\net9.0\BlockGame42.Assets.Pipeline.exe&quot; $(ProjectDir)Assets $(OutDir)Assets" />
   </Target>
 </Project>

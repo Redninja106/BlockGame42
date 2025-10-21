@@ -20,7 +20,7 @@ internal class ChunkManager
     {
         this.graphics = graphics;
 
-        int chunks = 2;
+        int chunks = 1;
 
         for (int x = -chunks; x < chunks; x++)
         {
@@ -112,7 +112,7 @@ internal class ChunkManager
 
                     if (chunk.Blocks[x, y, z] == Game.Blocks.Stone)
                     {
-                        chunk.BlockMasks[x, y, z] = chunk.BlockStates[x, y, z].DynamicBlock.Mask;
+                        chunk.BlockMasks[x, y, z] = chunk.BlockStates[x, y, z].DynamicBlock.GetBlockMask64();
                     }
                 }
             }

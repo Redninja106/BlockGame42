@@ -5,7 +5,7 @@ struct FsIn
 {
     float4 position : SV_Position;
     float3 worldPosition : TEXCOORD0;
-    float3 textureCoordinates : TEXCOORD1;
+    float4 textureCoordinates : TEXCOORD1;
     float3 normal : TEXCOORD2;
     int baseFaceID : TEXCOORD3;
 };
@@ -39,8 +39,8 @@ FsOut main(FsIn i)
     FsOut o;
 
     o.position = float4(i.worldPosition, 0);
-    o.texCoord = float4(i.textureCoordinates, 0);
-    o.normal =   float4(i.normal, 0);
+    o.normal = float4(i.normal, 0);
+    o.texCoord = i.textureCoordinates;
 
     float res = getres(linearize_depth(i.position.z));
     float2 uv = i.textureCoordinates.xy;

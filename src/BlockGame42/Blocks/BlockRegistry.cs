@@ -1,9 +1,11 @@
 ﻿using BlockGame42.Blocks;
 using BlockGame42.Chunks;
+using BlockGame42.Rendering;
 using SDL.GPU;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.NetworkInformation;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -12,9 +14,10 @@ internal class BlockRegistry
 {
     public readonly EmptyBlock Air = new EmptyBlock();
     public readonly EmptyBlock Unloaded = new EmptyBlock();
-    public readonly SolidBlock Unknown = new SolidBlock("unknown", new(255, 255, 255));
+    public readonly SolidBlock Unknown = new SolidBlock("unknown", null, new(255, 255, 255));
     public readonly DynamicBlock Stone = new DynamicBlock("stone", new(100, 20, 20));
-    public readonly SolidBlock Dirt = new SolidBlock("dirt", new(6, 0, 1));
+    public readonly SolidBlock Dirt = new SolidBlock("dirt", null, new(6, 0, 1));
+    public readonly SolidBlock Glowstone = new SolidBlock("glowstone", "glowstone", new(10, 10, 10));
 
     // public readonly Block MechanicalMachineChassis = new MachineChassisBlock();
 
@@ -31,20 +34,20 @@ class HalfBlock : Block
 
     public HalfBlock(uint texture, BlockStrength strength) : base(strength)
     {
-        Model = new HalfBlockModel(texture);
+        Model = new HalfBlockModel(Material.CreateUniform(texture, 0));
     }
 }
 
 class HalfBlockModel : BlockModel
 {
-    uint textureId;
+    Material material;
 
     BlockMesh halfMesh;
     BlockMesh fullMesh;
 
-    public HalfBlockModel(uint textureId)
+    public HalfBlockModel(Material material)
     {
-        this.textureId = textureId;
+        this.material = material;
 
         halfMesh = BlockMesh.CreateFromModel(Game.graphics, this, default);
         fullMesh = BlockMesh.CreateFromModel(Game.graphics, this, new() { HalfBlock = new(true, 0) });
@@ -68,9 +71,9 @@ class HalfBlockModel : BlockModel
         return BlockFaceMask.BottomHalf;
     }
 
-    public override uint GetTextureID(BlockState state, Direction direction)
+    public override Material GetMaterial(BlockState state)
     {
-        return textureId;
+        return material;
     }
 
     public override void AddInternalFaces(BlockState state, BlockMeshBuilder mesh)
@@ -86,7 +89,8 @@ class HalfBlockModel : BlockModel
                 new Vector2(1, 0),
                 new Vector2(0, 1),
 
-                this.textureId
+                this.material.Data.Transmission.Up,
+                this.material.Data.Emission.Up
                 );
         }
     }
@@ -134,8 +138,8 @@ class HalfBlockModel : BlockModel
         }
     }
 
-    public override byte GetVolumeMask(BlockState state)
+    public override ulong GetVolumeMask(BlockState state)
     {
-        return state.HalfBlock.Doubled ? (byte)0x0F : (byte)0xFF;
+        return state.HalfBlock.Doubled ? 0xFFFFFFFFFFFFFFFFul : 0x00000000FFFFFFFFul;
     }
 }

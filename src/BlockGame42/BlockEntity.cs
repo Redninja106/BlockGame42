@@ -110,8 +110,16 @@ class BlockMesh
 
         uint sizeInBytes = (uint)(MinimizedChunkVertex.Size * vertices.Length);
         vertexBuffer = graphics.device.CreateDataBuffer(DataBufferUsageFlags.Vertex, sizeInBytes);
-        graphics.transferBatcher.UploadToBuffer<MinimizedChunkVertex>(vertices, new(vertexBuffer, 0, sizeInBytes), false);
 
+        using TransferBuffer transferBuffer = graphics.device.CreateTransferBuffer(TransferBufferUsage.Upload, sizeInBytes);
+
+        Span<MinimizedChunkVertex> mappedBuffer = transferBuffer.Map<MinimizedChunkVertex>(false);
+        vertices.CopyTo(mappedBuffer);
+        transferBuffer.Unmap();
+
+        CopyPass pass = graphics.CommandBuffer.BeginCopyPass();
+        pass.UploadToDataBuffer(transferBuffer, 0, vertexBuffer, 0, sizeInBytes, false);
+        pass.End();
 
         vertexCount = vertices.Length;
     }
@@ -120,6 +128,7 @@ class BlockMesh
     {
         BlockMeshBuilder meshBuilder = new();
 
+        Material material = model.GetMaterial(blockState);
         for (int i = 0; i < 6; i++)
         {
             meshBuilder.AppendPartialBlockFace(
@@ -128,8 +137,9 @@ class BlockMesh
                 ChunkMesh.rightDirs[i].ToVector(),
                 ChunkMesh.upDirs[i].ToVector(),
                 ChunkMesh.forwardDirs[i].ToVector(),
-                model.GetTextureID(blockState, (Direction)i),
-                1.0f);
+                material.Data.Transmission[(Direction)i],
+                material.Data.Emission[(Direction)i]
+                );
         }
 
         model.AddInternalFaces(blockState, meshBuilder);

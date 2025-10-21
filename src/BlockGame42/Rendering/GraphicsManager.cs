@@ -19,7 +19,7 @@ internal class GraphicsManager
 
     public Device device;
     public ShaderManager shaders;
-    public TransferBufferBatcher transferBatcher;
+    // public TransferBufferBatcher transferBatcher;
     
     public CommandBuffer CommandBuffer { get; private set; }
     //public Texture SwapchainTexture { get; private set; }
@@ -44,11 +44,11 @@ internal class GraphicsManager
         this.assets = assets;
         this.device = new Device(ShaderFormat.DXIL, true);
         device.ClaimWindow(window);
-        device.SetSwapchainParameters(window, SwapchainComposition.SDR, PresentMode.Immediate);
+        device.SetSwapchainParameters(window, SwapchainComposition.SDRLinear, PresentMode.Immediate);
 
         shaders = new(device, assets);
 
-        transferBatcher = new(device, 64 * 1024 * 1024);
+        //transferBatcher = new(device, 64 * 1024 * 1024);
 
         CommandBuffer = null!;
 
@@ -107,15 +107,24 @@ internal class GraphicsManager
             SampleCount = SampleCount._1,
         });
 
-        TextureRegion region = new()
+        using TransferBuffer transferBuffer = device.CreateTransferBuffer(TransferBufferUsage.Upload, (uint)(4 * data.Width * data.Height));
+        CopyPass pass = CommandBuffer.BeginCopyPass();
+        TextureTransferInfo source = new()
+        {
+            TransferBuffer = transferBuffer,
+            Offset = 0,
+            PixelsPerRow = (uint)data.Width,
+            RowsPerLayer = (uint)data.Height,
+        };
+        TextureRegion destination = new()
         {
             Texture = texture,
             W = (uint)data.Width,
             H = (uint)data.Height,
             D = 1,
         };
-
-        transferBatcher.UploadToTexture(data.Data, (uint)data.Width, (uint)data.Height, region, false);
+        pass.UploadToTexture(source, destination, false);
+        pass.End();
 
         return texture;
     }

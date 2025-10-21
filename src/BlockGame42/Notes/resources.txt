@@ -1,0 +1,8 @@
+
+
+fast dda:
+https://www.researchgate.net/publication/233899848_Efficient_implementation_of_the_3D-DDA_ray_traversal_algorithm_on_GPU_and_its_application_in_radiation_dose_calculation
+
+ray tracing:
+https://raytracing.github.io/
+https://www.realtimerendering.com/raytracinggems/

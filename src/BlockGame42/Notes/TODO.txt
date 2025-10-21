@@ -7,6 +7,10 @@
 		- biomes?
 - find texture art
 	- maybe 32x32 actual pictures?
+- 64 trees?
+	- or just store mask as 64 bit for faster raycasting?
+
+- convert to fully spatial (position based) hash so gi shader can sample previous light instead of tracing reflections
 
 long term
 - serialization (rip system out of spacegame?)

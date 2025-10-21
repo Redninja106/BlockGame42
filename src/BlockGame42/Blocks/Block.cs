@@ -1,9 +1,11 @@
 ﻿using BlockGame42.Chunks;
+using BlockGame42.Rendering;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -129,7 +131,9 @@ abstract class Block
 abstract class BlockModel
 {
     public abstract BlockFaceMask GetFaceMask(BlockState state, Direction direction);
-    public abstract uint GetTextureID(BlockState state, Direction direction);
+    // public abstract uint GetTextureID(BlockState state, Direction direction);
+
+    public abstract Material GetMaterial(BlockState state);
 
     public abstract bool Intersect(BlockState state, Box box);
     public abstract bool Raycast(BlockState state, Ray ray, ref float t, ref Coordinates normal);
@@ -138,7 +142,7 @@ abstract class BlockModel
 
     public abstract BlockMesh GetMesh(BlockState state, out Matrix4x4 transform);
 
-    public abstract byte GetVolumeMask(BlockState state);
+    public abstract ulong GetVolumeMask(BlockState state);
 }
 
 [Flags]
@@ -166,12 +170,12 @@ enum BlockFaceMask
 
 class SolidBlockModel : BlockModel
 {
-    private uint textureId;
+    private Material textureSet;
     private BlockMesh mesh;
 
-    public SolidBlockModel(uint textureId)
+    public SolidBlockModel(Material textureSet)
     {
-        this.textureId = textureId;
+        this.textureSet = textureSet;
         mesh = BlockMesh.CreateFromModel(Game.graphics, this, default);
     }
 
@@ -180,10 +184,15 @@ class SolidBlockModel : BlockModel
         return BlockFaceMask.Full;
     }
 
-    public override uint GetTextureID(BlockState state, Direction direction)
+    public override Material GetMaterial(BlockState state)
     {
-        return this.textureId;
+        return textureSet;
     }
+
+    //public override uint GetTextureID(BlockState state, Direction direction)
+    //{
+    //    return this.textureId;
+    //}
 
     public override bool Intersect(BlockState state, Box box)
     {
@@ -224,16 +233,19 @@ class SolidBlockModel : BlockModel
         }
     }
 
-    public override byte GetVolumeMask(BlockState state)
+    public override ulong GetVolumeMask(BlockState state)
     {
-        return 0xFF;
+        return 0xFFFFFFFFFFFFFFFF;
     }
 }
 
 class EmptyBlockModel : BlockModel
 {
+    Material material;
+
     public EmptyBlockModel()
     {
+        material = Material.CreateUniform(0, 0);
     }
 
     public override BlockFaceMask GetFaceMask(BlockState state, Direction direction)
@@ -241,11 +253,10 @@ class EmptyBlockModel : BlockModel
         return BlockFaceMask.Empty;
     }
 
-    public override uint GetTextureID(BlockState state, Direction direction)
+    public override Material GetMaterial(BlockState state)
     {
-        return 0;
+        return material;
     }
-
 
     public override void AddInternalFaces(BlockState state, BlockMeshBuilder mesh)
     {
@@ -267,7 +278,7 @@ class EmptyBlockModel : BlockModel
         return null;
     }
 
-    public override byte GetVolumeMask(BlockState state)
+    public override ulong GetVolumeMask(BlockState state)
     {
         return 0x0;
     }

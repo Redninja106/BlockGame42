@@ -1,6 +1,5 @@
 ﻿using BlockGame42.Blocks;
 using BlockGame42.Chunks;
-using bottlenoselabs.Interop;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -132,7 +131,7 @@ internal class Player : Entity
         Ray ray = new(Camera.transform.Position, Camera.transform.Forward, 100);
         if (World.Raycast(ray, out float t, out Coordinates hitCoords, out Coordinates normal))
         {
-            Game.gameRenderer.FontRenderer.RenderText(Game.gameRenderer.GUIRenderer, World.GetBlockReference(hitCoords).Mask.ToString("x"), new(Game.graphics.Window.Width/2f,Game.graphics.Window.Height/2f), 0xFFFFFFFF);
+            Game.gameRenderer.FontRenderer.RenderText(Game.gameRenderer.GUIRenderer, World.GetBlockReference(hitCoords).Support.ToString(), new(Game.graphics.Window.Width/2f,Game.graphics.Window.Height/2f), 0xFFFFFFFF);
         }
     }
 

@@ -25,7 +25,7 @@ internal class Chunk
     // public ChunkAttribute<sbyte> Temperature { get; } = new();
     // public ChunkAttribute<byte> Lighting { get; } = new();
     public ChunkAttribute<BlockState> BlockStates { get; } = new();
-    public ChunkAttribute<byte> BlockMasks { get; } = new();
+    public ChunkAttribute<ulong> BlockMasks { get; } = new();
 
     public List<Entity> Entities { get; set; } = new();
 

@@ -11,20 +11,10 @@
 	- or just store mask as 64 bit for faster raycasting?
 
 - graphics:
-	- accumulated radiance decay
-		- idea: instead of accumulating, each hashmap entry is a small ring buffer containings n frames of 8 bit irradiance, where irradiance is averaged over n frames
-			- would greatly increase memory footprint but increasing samples per frame and using 8 bit irradiance would offset this
-			- can not clear hashmap on chunk updates 
-			- block ids must be spatially coherent
-				- sm 6.6 64bit atomics/bitpacked position
-				- bitpack chunkid & chunk-local position <--- 32*16=2^9=9bits/dim; 5 bit chunkid... not very many chunks
-				- seperate chunkid & chunk-local position
-				- hash+checksum (like rtgems2ch41) hash x,y,z,n		
-
+	- spatial hash LODs
 	- reflective materials
-	- convert to fully spatial (position based) hash so gi shader can sample previous light instead of tracing bounces (& for lighting in reflections)
 	- raytracing acceleration (mipmaps or 64 trees)
-	- halton sequences for faster ray traversal
+	- halton sequences for faster ray convergence
 
 long term
 - serialization (rip system out of spacegame?)

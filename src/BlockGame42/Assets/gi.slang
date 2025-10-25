@@ -124,14 +124,13 @@ uint find_or_insert(float3 position, float3 normal)
 float3 ray_color(Ray ray)
 {
     const int MaxBounces = 3;
-
+    
     float hitT;
     float3 hitNormal;
     int3 hitVoxel;
 
     float3 transmission[MaxBounces];
     float3 emission[MaxBounces];
-
 
     for (int i = 0; i < MaxBounces; i++)
     {
@@ -155,31 +154,28 @@ float3 ray_color(Ray ray)
         }
         else
         {
-            const float skystrength = 0*.25;
+            const float skystrength = .25;
 
             // sky emission
             emission[i] += float3(skystrength); // + 0.5 * float3(.392f, .584f, .929f);
             break;
         }
     }
-    
-    // sun emission!
+
+    // sun emission
+    const float sunfuzz = 0.005;
+    const float sunstrength = 1.00;
+
+    Ray sunRay;
+    sunRay.origin = ray.origin;
+    sunRay.direction = normalize(uniforms.sundir.xyz);
+    sunRay.inverseDirection = 1.0 / sunRay.direction;
+    sunRay.length = ray.length;
+
+    if (!dda(sunRay, hitT, hitNormal, hitVoxel))
     {
-        const float sunfuzz = 0.005;
-        const float sunstrength = 1.00;
-
-        Ray sunRay;
-        sunRay.origin = ray.origin;
-        sunRay.direction = normalize(uniforms.sundir.xyz + sunfuzz * random.NextUnitVector());
-        sunRay.inverseDirection = 1.0 / sunRay.direction;
-        sunRay.length = ray.length;
-
-        // emission[0] = float3(0, 0, 0);
-        if (!dda(sunRay, hitT, hitNormal, hitVoxel))
-        {
-            float sunbrightness = dot(sunRay.direction, uniforms.sundir.xyz);
-            emission[0] += float3(sunstrength * max(0, sunbrightness));
-        }
+        float sunbrightness = dot(sunRay.direction, normalize(uniforms.sundir.xyz));
+        emission[0] += float3(sunstrength * max(0, sunbrightness));
     }
 
     float3 color = float3(0, 0, 0);

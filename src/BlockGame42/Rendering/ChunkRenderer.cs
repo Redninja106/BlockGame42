@@ -122,7 +122,7 @@ internal class ChunkRenderer
             VertexInputState = default,
         });
 
-        tileLookupManager = new TileLookupManager(graphics, 10, 2_000_000, 10);
+        tileLookupManager = new TileLookupManager(graphics, 3, 2_000_000, 33);
 
         // tileLookup = graphics.device.CreateDataBuffer(DataBufferUsageFlags.ComputeStorageRead | DataBufferUsageFlags.ComputeStorageWrite, (uint)Unsafe.SizeOf<TileRecord>() * 10_000_000);
     }
@@ -243,12 +243,13 @@ internal class ChunkRenderer
         uniforms.tileOffset = tileLookupManager.CurrentPhase * tileLookupManager.TilesPerPhase;
         uniforms.tileCount = tileLookupManager.TilesPerPhase;
         uniforms.ticks = (uint)Application.GetTicksNS();
+        uniforms.sundir = this.sundir;
 
         if (animateSun)
         {
             uniforms.sundir = Vector4.Transform(uniforms.sundir, Matrix4x4.CreateFromAxisAngle(Vector3.UnitX, (Application.GetTicks() / 1000f) * MathF.Tau * (1f / 240)));
         }
-        
+
         uniforms.blockMasksOffset = Chunk.Size * blockMaskManager.ChunkOffset;
         uniforms.cameraPosition = new(Game.player.Camera.transform.Position, 0);
         graphics.CommandBuffer.PushComputeUniformData(0, ref uniforms);

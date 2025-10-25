@@ -12,7 +12,7 @@ class SolidBlock : Block
 
     public override BlockPlacementHandler PlacementHandler => BlockPlacementHandler.Solid;
 
-    public SolidBlock(string assetName, string emissionAssetName, BlockStrength strength) : base(strength)
+    public SolidBlock(string? assetName, string? emissionAssetName, BlockStrength strength) : base(strength)
     {
         uint texid = Game.Textures.Get(assetName);
         uint emit_texid = Game.Textures.Get(emissionAssetName);

@@ -91,28 +91,29 @@ internal class ChunkManager
                     //    chunk.BlockStates[x, y, z].Raw = 0x00000000FFFFFFFF;
                     //}
 
-                    for (int by = 0; by < 2; by++)
-                    {
-                        for (int bz = 0; bz < 2; bz++)
-                        {
-                            for (int bx = 0; bx < 2; bx++)
-                            {
-                                float bitx = gx + bx * .5f + .25f;
-                                float bity = gy + by * .5f + .25f;
-                                float bitz = gz + bz * .5f + .25f;
-                                float h = (15 + 4 * float.Cos(bitx * 1/16f) + 4 * float.Cos(bitz * 1/16f));
-                                if (bity < h)
-                                {
-                                    chunk.Blocks[x, y, z] = Game.Blocks.Stone;
-                                    chunk.BlockStates[x, y, z].DynamicBlock[(by << 2) + (bz << 1) + bx] = true;
-                                }
-                            }
-                        }
-                    }
+                    // for (int by = 0; by < 2; by++)
+                    // {
+                    //     for (int bz = 0; bz < 2; bz++)
+                    //     {
+                    //         for (int bx = 0; bx < 2; bx++)
+                    //         {
+                    //             float bitx = gx + bx * .5f + .25f;
+                    //             float bity = gy + by * .5f + .25f;
+                    //             float bitz = gz + bz * .5f + .25f;
+                    //             float h = (15 + 4 * float.Cos(bitx * 1/16f) + 4 * float.Cos(bitz * 1/16f));
+                    //             if (bity < h)
+                    //             {
+                    //                 chunk.Blocks[x, y, z] = Game.Blocks.Stone;
+                    //                 chunk.BlockStates[x, y, z].DynamicBlock[(by << 2) + (bz << 1) + bx] = true;
+                    //             }
+                    //         }
+                    //     }
+                    // }
 
-                    if (chunk.Blocks[x, y, z] == Game.Blocks.Stone)
+                    if (gy < (15 + 4 * float.Cos(gx * 1 / 16f) + 4 * float.Cos(gz * 1 / 16f)))
                     {
-                        chunk.BlockMasks[x, y, z] = chunk.BlockStates[x, y, z].DynamicBlock.GetBlockMask64();
+                        chunk.Blocks[x, y, z] = Game.Blocks.Stone;
+                        chunk.BlockMasks[x, y, z] = 0xFFFFFFFFFFFFFFFF;
                     }
                 }
             }

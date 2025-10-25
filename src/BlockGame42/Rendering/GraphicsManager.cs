@@ -42,7 +42,14 @@ internal class GraphicsManager
     {
         this.Window = window;
         this.assets = assets;
-        this.device = new Device(ShaderFormat.DXIL, true);
+
+        Properties deviceProps = new();
+        
+        deviceProps.SetBoolean(Device.PropertyCreateDebugModeBoolean, true);
+        deviceProps.SetBoolean(Device.PropertyCreateShadersDXILBoolean, true);
+        deviceProps.SetBoolean(Device.PropertyCreatePreferLowPowerBoolean, false);
+
+        this.device = new Device(deviceProps);
 
         // var deviceProperties = this.device.GetProperties();
         // Console.WriteLine("device: " + deviceProperties.GetString(SDL.Native.Functions.SDL_PROP_GPU_DEVICE_NAME_STRING, default));

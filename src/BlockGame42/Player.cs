@@ -116,9 +116,15 @@ internal class Player : Entity
             Game.gameRenderer.ChunkRenderer.sundir = new Vector4(-this.Transform.Forward, 1);
         }
 
+        if ((mouseButtons & MouseButtonFlags.Middle) != 0 && (lastMouseButtons & MouseButtonFlags.Middle) == 0)
+        {
+            placementIdx++;
+            placementIdx %= placementArray.Length;
+        }
+
         if ((mouseButtons & MouseButtonFlags.Left) != 0 && (lastMouseButtons & MouseButtonFlags.Left) == 0)
         {
-            Block placingBlock = Game.Blocks.Stone;
+            Block placingBlock = placementArray[placementIdx];
             placingBlock.PlacementHandler.OnPlaceBlock(World, Camera, placingBlock);
         }
         
@@ -126,12 +132,17 @@ internal class Player : Entity
         lastMouseButtons = mouseButtons;
     }
 
+    string[] nameArray = ["stone", "glowstone", "dirt"];
+    Block[] placementArray = [Game.Blocks.Stone, Game.Blocks.Glowstone, Game.Blocks.Dirt];
+    int placementIdx = 0;
+
     public void Render()
     {
         Ray ray = new(Camera.transform.Position, Camera.transform.Forward, 100);
         if (World.Raycast(ray, out float t, out Coordinates hitCoords, out Coordinates normal))
         {
             Game.gameRenderer.FontRenderer.RenderText(Game.gameRenderer.GUIRenderer, World.GetBlockReference(hitCoords).Support.ToString(), new(Game.graphics.Window.Width/2f,Game.graphics.Window.Height/2f), 0xFFFFFFFF);
+            Game.gameRenderer.FontRenderer.RenderText(Game.gameRenderer.GUIRenderer, nameArray[placementIdx], new(5,30), 0xFFFFFFFF);
         }
     }
 

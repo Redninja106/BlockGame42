@@ -272,7 +272,7 @@ float3 ray_color(Ray ray)
 FsOut main(VsOut vsout)
 {
     random.seed = (int)(vsout.worldPosition.x * 125451) + (int)(vsout.worldPosition.y * 16535);
-    random.Cycle();
+    random.Next();
 
     float4 color = texture.Sample(sampler, float3(vsout.textureCoordinates, vsout.blockTextureId));
 

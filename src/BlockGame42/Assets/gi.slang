@@ -1,11 +1,6 @@
 #include "sdl.slang"
 #include "random.slang"
-
-struct TileRecord
-{
-    uint id;
-    uint4 accumulatedColor;
-};
+#include "hash.slang"
 
 struct MaterialData
 {
@@ -14,7 +9,8 @@ struct MaterialData
 };
 
 // RW Resources
-SDL_CS_RW_RESOURCE(0, RWStructuredBuffer<TileRecord> tileLookup);
+SDL_CS_RW_RESOURCE(0, RWStructuredBuffer<uint> tileChecksums);
+SDL_CS_RW_RESOURCE(1, RWStructuredBuffer<uint4> tilePayloads);
 
 // Samplers/Sampled Textures
 SDL_CS_SAMPLER(0, SamplerState sampler);
@@ -22,19 +18,20 @@ SDL_CS_RESOURCE(0, Texture2DArray<float4> materialTextures);
 
 SDL_CS_RESOURCE(1, Texture2D<float4> positionTarget);
 SDL_CS_RESOURCE(2, Texture2D<float4> normalTarget);
-SDL_CS_RESOURCE(3, Texture2D<uint> idTarget);
 
-SDL_CS_RESOURCE(4, Texture3D<uint2> blockMasks);
-SDL_CS_RESOURCE(5, Texture3D<uint> materialIds);
+SDL_CS_RESOURCE(3, Texture3D<uint2> blockMasks);
+SDL_CS_RESOURCE(4, Texture3D<uint> materialIds);
 
-SDL_CS_RESOURCE(6, StructuredBuffer<MaterialData> materials)
+
+SDL_CS_RESOURCE(5, StructuredBuffer<MaterialData> materials)
 
 struct Uniforms
 {
     float4 sundir;
     float4 cameraPosition;
     int3 blockMasksOffset;
-    uint lookupSize;
+    uint tileOffset;
+    uint tileCount;
     uint ticks;
 };
 
@@ -42,13 +39,13 @@ SDL_CS_UNIFORM_BUFFER(0, Uniforms uniforms);
 
 static Random random;
 
+
 [shader("compute")]
 [numthreads(16, 16, 1)]
 void main(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     float3 position = positionTarget[dispatchThreadID.xy].xyz;
     float3 normal = normalTarget[dispatchThreadID.xy].xyz;
-    uint id = idTarget[dispatchThreadID.xy];
 
     random.seed = uniforms.ticks * 0x3f05aa5f +
                   (dispatchThreadID.x + 0x8523) * 0xb7e35a7d + 
@@ -91,45 +88,36 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     totalColor *= (1.0 / samples);
     // totalColor = (1 - reflectiveness) * totalColor + reflectiveness * reflection_color;
 
-    uint idx = find_or_insert(id);
-    InterlockedAdd(tileLookup[idx].accumulatedColor.r, int(255 * totalColor.r));
-    InterlockedAdd(tileLookup[idx].accumulatedColor.g, int(255 * totalColor.g));
-    InterlockedAdd(tileLookup[idx].accumulatedColor.b, int(255 * totalColor.b));
-    InterlockedAdd(tileLookup[idx].accumulatedColor.a, 1);
+    uint idx = find_or_insert(position, normal);
+    InterlockedAdd(tilePayloads[idx].r, int(255 * totalColor.r));
+    InterlockedAdd(tilePayloads[idx].g, int(255 * totalColor.g));
+    InterlockedAdd(tilePayloads[idx].b, int(255 * totalColor.b));
+    InterlockedAdd(tilePayloads[idx].a, 1);
 }
 
-uint32_t hash(uint32_t x) 
-{
-    x = ((x >> 16) ^ x) * 0x45d9f3bu;
-    x = ((x >> 16) ^ x) * 0x45d9f3bu;
-    x = (x >> 16) ^ x;
-    return x;
-}
 
-uint find_or_insert(uint id)
+
+uint find_or_insert(float3 position, float3 normal)
 {
     const int max_search = 32;
 
-    // linear probing
-    uint searchIndex = hash(id) % uniforms.lookupSize;
+    uint hash, checksum;
+    get_hash_and_checksum(position, normal, hash, checksum);
+
+    uint searchIndex = hash % uniforms.tileCount;
     for (int i = 0; i < max_search; i++)
     { 
         uint original;
-        InterlockedCompareExchange(tileLookup[searchIndex].id, 0, id, original);
-        if (original == 0 || original == id)
+        InterlockedCompareExchange(tileChecksums[uniforms.tileOffset + searchIndex], 0, checksum, original);
+        if (original == 0 || original == checksum)
         {
-            return searchIndex;
+            return uniforms.tileOffset + searchIndex;
         }
 
-        searchIndex++;
-
-        if (searchIndex >= uniforms.lookupSize)
-        {
-            searchIndex = 0;
-        }
+        searchIndex = pcg_hash(searchIndex) % uniforms.tileCount;
     }
 
-    return searchIndex;
+    return 0xFFFFFFFF;
 }
 
 
@@ -144,29 +132,11 @@ float3 ray_color(Ray ray)
     float3 transmission[MaxBounces];
     float3 emission[MaxBounces];
 
+
     for (int i = 0; i < MaxBounces; i++)
     {
         transmission[i] = 0;
         emission[i] = 0;
-
-        // sun emission!
-        {
-            const float sunfuzz = 0.005;
-            const float sunstrength = .75;
-        
-            Ray sunRay;
-            sunRay.origin = ray.origin;
-            sunRay.direction = normalize(uniforms.sundir.xyz + sunfuzz * random.NextUnitVector());
-            sunRay.inverseDirection = 1.0 / ray.direction;
-            sunRay.length = ray.length;
-        
-            emission[i] = float3(0, 0, 0);
-            if (!dda(sunRay, hitT, hitNormal, hitVoxel))
-            {
-                float sunbrightness = dot(sunRay.direction, uniforms.sundir.xyz);
-                emission[i] += float3(sunstrength * max(0, sunbrightness));
-            }
-        }
 
         if (dda(ray, hitT, hitNormal, hitVoxel))
         {
@@ -185,11 +155,30 @@ float3 ray_color(Ray ray)
         }
         else
         {
-            const float skystrength = .25;
+            const float skystrength = 0*.25;
 
             // sky emission
             emission[i] += float3(skystrength); // + 0.5 * float3(.392f, .584f, .929f);
             break;
+        }
+    }
+    
+    // sun emission!
+    {
+        const float sunfuzz = 0.005;
+        const float sunstrength = 1.00;
+
+        Ray sunRay;
+        sunRay.origin = ray.origin;
+        sunRay.direction = normalize(uniforms.sundir.xyz + sunfuzz * random.NextUnitVector());
+        sunRay.inverseDirection = 1.0 / sunRay.direction;
+        sunRay.length = ray.length;
+
+        // emission[0] = float3(0, 0, 0);
+        if (!dda(sunRay, hitT, hitNormal, hitVoxel))
+        {
+            float sunbrightness = dot(sunRay.direction, uniforms.sundir.xyz);
+            emission[0] += float3(sunstrength * max(0, sunbrightness));
         }
     }
 
@@ -391,7 +380,7 @@ bool BoxRaycast(Box box, Ray ray, out float t, out float3 normal)
 
 uint64_t get_ray_mask(Ray ray, float t_entrance, float3 t_delta, int3 step)
 {
-    float3 pos = ray.at(t_entrance + 0.01);
+    float3 pos = ray.at(t_entrance);
     int3 voxel = int3(frac(pos)*4);
 
     float3 t = .25 * t_delta * select(ray.direction > 0, 1 - frac(pos*4), frac(pos*4));
@@ -414,12 +403,12 @@ uint64_t get_ray_mask(Ray ray, float t_entrance, float3 t_delta, int3 step)
     return result;
 }
 
-bool hit_ray_mask(Ray ray, uint64_t mask, int3 voxel, float t_entrance, float3 delta_t, int3 step, out float outT, out float3 outNormal)
+bool hit_ray_mask(Ray ray, uint64_t mask, int3 v, float t_entrance, float3 delta_t, int3 step, out float outT, out float3 outNormal)
 {
     delta_t *= .25;
 
     float3 pos = ray.at(t_entrance + 0.00001);
-    int3 voxel = int3(floor((pos) * 4));
+    int3 voxel = int3(floor((pos - v) * 4));
 
     float3 t = delta_t * select(ray.direction > 0, 1 - frac(pos * 4), frac(pos * 4));
 
@@ -473,7 +462,7 @@ bool dda(Ray ray, out float outT, out float3 outNormal, out int3 outVoxel)
                 outVoxel = voxel;
                 return true;
             }
-            else if (hit_ray_mask(ray, mask, voxel, max(prev_t, 0), delta_t, step, outT, outNormal))
+            else if (hit_ray_mask(ray, mask, voxel, select(all(voxelIncr == 0), 0, prev_t), delta_t, step, outT, outNormal))
             {
                 if (all(outNormal == 0))
                 {

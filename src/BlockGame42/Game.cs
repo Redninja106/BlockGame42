@@ -128,13 +128,9 @@ class Game : Application
     {
         graphics.AcquireCommandBuffer();
 
-        window.SetTitle($"Block Game - {1f / deltaTime}FPS");
-
         deltaTime = float.Min(deltaTime, 1 / 30f);
 
         accumulatedTickTime += deltaTime;
-
-        //graphics.transferBatcher.BeginBatch(graphics.CommandBuffer);
 
         player.Update(deltaTime);
         player.Camera.Update(window.Width, window.Height);
@@ -144,12 +140,12 @@ class Game : Application
 
         while (accumulatedTickTime > 1 / 20f)
         {
+            window.SetTitle($"Block Game - {1f / deltaTime}FPS");
             accumulatedTickTime -= 1 / 20f;
             world.Tick();
         }
 
         world.Chunks.BuildStaleChunks();
-        //graphics.transferBatcher.EndBatch();
 
         if (graphics.BeginFrame())
         {
@@ -194,7 +190,6 @@ class GameRenderer(GraphicsManager graphics, IAssetSource assets, World world, P
     public readonly World world = world;
     public readonly Player player = player;
 
-
     public BlockMeshRenderer BlockMeshRenderer { get; } = new(graphics);
     public ChunkRenderer ChunkRenderer { get; } = new(graphics);
     public GUIRenderer GUIRenderer { get; } = new(graphics);
@@ -215,14 +210,13 @@ class GameRenderer(GraphicsManager graphics, IAssetSource assets, World world, P
         OverlayRenderer.PushLine(new(0, 25, 0), new(1, 25, 0), 0xFF0000FF);
         OverlayRenderer.PushLine(new(0, 25, 0), new(0, 26, 0), 0xFF00FF00);
         OverlayRenderer.PushLine(new(0, 25, 0), new(0, 25, 1), 0xFFFF0000);
-
+        
         OverlayRenderer.Flush();
 
         GUIRenderer.Begin(world.Graphics.Window.Width, world.Graphics.Window.Height);
 
         DrawCrosshair();
         Game.player.Render();
-        //FontRenderer.RenderText(GUIRenderer, "Hello World!y", new(world.Graphics.Window.Width/2f, world.Graphics.Window.Height/2f), 0xFF00FF00);
 
         GUIRenderer.Flush();
     }

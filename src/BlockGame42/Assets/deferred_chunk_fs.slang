@@ -1,5 +1,6 @@
-#include "random.slang"
 #include "sdl.slang"
+#include "random.slang"
+#include "hash.slang"
 
 struct FsIn
 {

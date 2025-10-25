@@ -17,12 +17,14 @@ internal class ChunkRenderer
     private readonly Sampler sampler;
     private readonly TransferBuffer blockMaskVolumeTransferBuffer;
     private readonly BlockMaskManager blockMaskManager;
-    
+    private readonly TileLookupManager tileLookupManager;
+
     private ComputePipeline giPipeline;
     private GraphicsPipeline tileRenderPipeline;
-    private DataBuffer tileLookup;
+    // private DataBuffer tileLookup;
 
-    public Vector4 sundir = new Vector4(0, 1, 0, 1);
+    public Vector4 sundir = new Vector4(MathF.Cos(60 / 180f * MathF.PI), MathF.Sin(60 / 180f * MathF.PI), 0, 1);
+    public bool animateSun = true;
 
     struct TileRecord
     {
@@ -119,9 +121,10 @@ internal class ChunkRenderer
             MultisampleState = default,
             VertexInputState = default,
         });
-        
-        tileLookup = graphics.device.CreateDataBuffer(DataBufferUsageFlags.ComputeStorageRead | DataBufferUsageFlags.ComputeStorageWrite, (uint)Unsafe.SizeOf<TileRecord>() * 8*1920*1080);
-        Console.WriteLine($"using {tileLookup.Size >> 20}MB tile lookup");
+
+        tileLookupManager = new TileLookupManager(graphics, 10, 2_000_000, 10);
+
+        // tileLookup = graphics.device.CreateDataBuffer(DataBufferUsageFlags.ComputeStorageRead | DataBufferUsageFlags.ComputeStorageWrite, (uint)Unsafe.SizeOf<TileRecord>() * 10_000_000);
     }
 
     struct Uniforms
@@ -129,9 +132,9 @@ internal class ChunkRenderer
         public Vector4 sundir;
         public Vector4 cameraPosition;
         public Coordinates blockMasksOffset;
-        public uint lookupSize;
+        public uint tileOffset;
+        public uint tileCount;
         public uint ticks;
-
     }
 
     public void Render(Camera camera, ChunkManager chunks)
@@ -147,10 +150,11 @@ internal class ChunkRenderer
             }
         }
 
-        if (anyStale)
-        {
-            graphics.ClearDataBuffer(tileLookup, false);
-        }
+
+        // if (anyStale)
+        // {
+        //     graphics.ClearDataBufferRange(tileLookup, 0, tileLookup.Size, false);
+        // }
 
         ColorTargetInfo positionTarget = new()
         {
@@ -211,10 +215,11 @@ internal class ChunkRenderer
         
         renderPass.End();
 
-        // graphics.ClearDataBuffer(tileLookup, true);
+        //graphics.ClearDataBuffer(tileLookup, false);
 
-        StorageBufferReadWriteBinding tileLookupBinding = new(tileLookup, false);
-        var giPass = graphics.CommandBuffer.BeginComputePass([], [tileLookupBinding]);
+        StorageBufferReadWriteBinding checksumsBinding = new(tileLookupManager.GetChecksums(), false);
+        StorageBufferReadWriteBinding payloadsBinding = new(tileLookupManager.GetPayloads(), false);
+        var giPass = graphics.CommandBuffer.BeginComputePass([], [checksumsBinding, payloadsBinding]);
 
         giPass.BindComputeSamplers(0, [
             new(Game.Textures.GetTextureArray(), sampler),
@@ -223,7 +228,6 @@ internal class ChunkRenderer
         giPass.BindStorageTextures(0, [
             graphics.RenderTargets.PositionTexture, 
             graphics.RenderTargets.NormalTexture, 
-            graphics.RenderTargets.TexelIDTexture,
 
             blockMaskManager.GetBlockMaskTexture(),
             blockMaskManager.GetMaterialIDTexture(), 
@@ -236,9 +240,15 @@ internal class ChunkRenderer
         giPass.BindPipeline(giPipeline);
 
         Uniforms uniforms = default;
-        uniforms.lookupSize = tileLookup.Size / (uint)Unsafe.SizeOf<TileRecord>();
+        uniforms.tileOffset = tileLookupManager.CurrentPhase * tileLookupManager.TilesPerPhase;
+        uniforms.tileCount = tileLookupManager.TilesPerPhase;
         uniforms.ticks = (uint)Application.GetTicksNS();
-        uniforms.sundir = this.sundir;
+
+        if (animateSun)
+        {
+            uniforms.sundir = Vector4.Transform(uniforms.sundir, Matrix4x4.CreateFromAxisAngle(Vector3.UnitX, (Application.GetTicks() / 1000f) * MathF.Tau * (1f / 240)));
+        }
+        
         uniforms.blockMasksOffset = Chunk.Size * blockMaskManager.ChunkOffset;
         uniforms.cameraPosition = new(Game.player.Camera.transform.Position, 0);
         graphics.CommandBuffer.PushComputeUniformData(0, ref uniforms);
@@ -257,26 +267,37 @@ internal class ChunkRenderer
 
         StorageTextureReadWriteBinding colorTargetBinding = new(graphics.RenderTargets.SwapchainTexture, 0, 0, false);
         
-        var tileAveragePass = graphics.CommandBuffer.BeginRenderPass([new ColorTargetInfo() 
+        var tileRenderPass = graphics.CommandBuffer.BeginRenderPass([new ColorTargetInfo() 
         { 
             Texture = graphics.RenderTargets.SwapchainTexture,
             LoadOp = LoadOp.Load,
             StoreOp = StoreOp.Store,
         }], default);
 
-        graphics.CommandBuffer.PushFragmentUniformData(0, ref uniforms.lookupSize);
+        graphics.CommandBuffer.PushFragmentUniformData(0, ref uniforms);
 
-        Matrix4x4 mat = Matrix4x4.CreateFromQuaternion(Game.player.Camera.transform.Rotation);
+        TileRenderUniforms tileUniforms = new()
+        {
+            phaseCount = tileLookupManager.PhaseCount,
+            tileCount = tileLookupManager.TilesPerPhase,
+        };
 
-        graphics.CommandBuffer.PushFragmentUniformData(0, ref uniforms.lookupSize);
-        graphics.CommandBuffer.PushFragmentUniformData(1, ref mat);
+        graphics.CommandBuffer.PushFragmentUniformData(0, ref tileUniforms);
 
-        tileAveragePass.BindFragmentSamplers(0, new TextureSamplerBinding(Game.Textures.GetTextureArray(), sampler));
-        tileAveragePass.BindFragmentStorageTextures(0, [graphics.RenderTargets.TexCoordTexture, graphics.RenderTargets.TexelIDTexture]);
-        tileAveragePass.BindFragmentStorageBuffers(0, [tileLookup]);
-        tileAveragePass.BindPipeline(tileRenderPipeline);
-        tileAveragePass.DrawPrimitives(3, 1, 0, 0);
-        tileAveragePass.End();
+        tileRenderPass.BindFragmentSamplers(0, new TextureSamplerBinding(Game.Textures.GetTextureArray(), sampler));
+        tileRenderPass.BindFragmentStorageTextures(0, [graphics.RenderTargets.PositionTexture, graphics.RenderTargets.NormalTexture, graphics.RenderTargets.TexCoordTexture]);
+        tileRenderPass.BindFragmentStorageBuffers(0, [tileLookupManager.GetChecksums(), tileLookupManager.GetPayloads()]);
+        tileRenderPass.BindPipeline(tileRenderPipeline);
+        tileRenderPass.DrawPrimitives(3, 1, 0, 0);
+        tileRenderPass.End();
+
+        tileLookupManager.PhaseTick();
+    }
+
+    struct TileRenderUniforms
+    {
+        public uint phaseCount;
+        public uint tileCount;
     }
 
     struct ChunkData

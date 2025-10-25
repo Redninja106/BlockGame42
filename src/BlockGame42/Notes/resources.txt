@@ -6,3 +6,6 @@ https://www.researchgate.net/publication/233899848_Efficient_implementation_of_t
 ray tracing:
 https://raytracing.github.io/
 https://www.realtimerendering.com/raytracinggems/
+
+spatial hashing:
+https://link.springer.com/book/10.1007/978-1-4842-7185-8

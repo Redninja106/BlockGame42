@@ -43,6 +43,10 @@ internal class GraphicsManager
         this.Window = window;
         this.assets = assets;
         this.device = new Device(ShaderFormat.DXIL, true);
+
+        // var deviceProperties = this.device.GetProperties();
+        // Console.WriteLine("device: " + deviceProperties.GetString(SDL.Native.Functions.SDL_PROP_GPU_DEVICE_NAME_STRING, default));
+
         device.ClaimWindow(window);
         device.SetSwapchainParameters(window, SwapchainComposition.SDRLinear, PresentMode.Immediate);
 
@@ -108,6 +112,11 @@ internal class GraphicsManager
         });
 
         using TransferBuffer transferBuffer = device.CreateTransferBuffer(TransferBufferUsage.Upload, (uint)(4 * data.Width * data.Height));
+        
+        Span<byte> mappedData = transferBuffer.Map(false);
+        data.Data.CopyTo(mappedData);
+        transferBuffer.Unmap();
+
         CopyPass pass = CommandBuffer.BeginCopyPass();
         TextureTransferInfo source = new()
         {
@@ -129,13 +138,26 @@ internal class GraphicsManager
         return texture;
     }
 
-    public void ClearDataBuffer(DataBuffer buffer, bool cycle)
+    /// <summary>
+    /// note: offset &amp; length rounded down to nearest word
+    /// </summary>
+    public void ClearDataBufferRange(DataBuffer buffer, uint offset, uint length, bool cycle)
     {
-        const int bytesPerGroup = (16 * 64);
+        const int bytesPerGroup = (4 * 64);
         ComputePass pass = CommandBuffer.BeginComputePass([], [new StorageBufferReadWriteBinding(buffer, cycle)]);
+        
+        ClearDataBufferArgs args = new() { uint4_offset = offset / 4, uint4_length = length / 4 };
+        CommandBuffer.PushComputeUniformData(0, ref args);
+
         pass.BindPipeline(zeroBufferPipeline);
         pass.Dispatch((buffer.Size + bytesPerGroup - 1) / bytesPerGroup, 1, 1);
         pass.End();
+    }
+
+    struct ClearDataBufferArgs
+    {
+        public uint uint4_offset;
+        public uint uint4_length;
     }
 
 }

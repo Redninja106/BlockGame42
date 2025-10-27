@@ -17,7 +17,8 @@ internal class BlockRegistry
     public readonly SolidBlock Unknown = new SolidBlock("unknown", null, new(255, 255, 255));
     public readonly SolidBlock Stone = new SolidBlock("stone", null, new(100, 20, 20));
     public readonly SolidBlock Dirt = new SolidBlock("dirt", null, new(6, 0, 1));
-    public readonly SolidBlock Glowstone = new SolidBlock("glowstone", "glowstone", new(10, 10, 10));
+    public readonly SolidBlock Glowstone = new SolidBlock("glowstone", "glowstone_emissive", new(10, 10, 10));
+    public readonly SolidBlock IronBlock = new SolidBlock("iron_block", "iron_emissive", new(10, 10, 10));
 
     // public readonly Block MechanicalMachineChassis = new MachineChassisBlock();
 

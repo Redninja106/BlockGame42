@@ -83,6 +83,7 @@ internal class GraphicsManager
         return RenderTargets.AcquireSwapchainTexture(CommandBuffer, Window);
     }
 
+
     public void EndFrame()
     {
         this.RenderTargets.SwapchainTexture = null!;
@@ -98,6 +99,7 @@ internal class GraphicsManager
         result.Data = data[8..];
         return result;
     }
+
 
     public Texture LoadTexture(string assetName)
     {

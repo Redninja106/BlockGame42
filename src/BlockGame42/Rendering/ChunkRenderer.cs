@@ -122,7 +122,7 @@ internal class ChunkRenderer
             VertexInputState = default,
         });
 
-        tileLookupManager = new TileLookupManager(graphics, 3, 2_000_000, 33);
+        tileLookupManager = new TileLookupManager(graphics, 10, 5_000_000, 10);
 
         // tileLookup = graphics.device.CreateDataBuffer(DataBufferUsageFlags.ComputeStorageRead | DataBufferUsageFlags.ComputeStorageWrite, (uint)Unsafe.SizeOf<TileRecord>() * 10_000_000);
     }
@@ -134,6 +134,7 @@ internal class ChunkRenderer
         public Coordinates blockMasksOffset;
         public uint tileOffset;
         public uint tileCount;
+        public uint phaseCount;
         public uint ticks;
     }
 
@@ -218,8 +219,9 @@ internal class ChunkRenderer
         //graphics.ClearDataBuffer(tileLookup, false);
 
         StorageBufferReadWriteBinding checksumsBinding = new(tileLookupManager.GetChecksums(), false);
-        StorageBufferReadWriteBinding payloadsBinding = new(tileLookupManager.GetPayloads(), false);
-        var giPass = graphics.CommandBuffer.BeginComputePass([], [checksumsBinding, payloadsBinding]);
+        StorageBufferReadWriteBinding irradiancesBinding = new(tileLookupManager.GetIrradiances(), false);
+        StorageBufferReadWriteBinding reflectionsBinding = new(tileLookupManager.GetReflections(), false);
+        var giPass = graphics.CommandBuffer.BeginComputePass([], [checksumsBinding, irradiancesBinding, reflectionsBinding]);
 
         giPass.BindComputeSamplers(0, [
             new(Game.Textures.GetTextureArray(), sampler),
@@ -228,6 +230,7 @@ internal class ChunkRenderer
         giPass.BindStorageTextures(0, [
             graphics.RenderTargets.PositionTexture, 
             graphics.RenderTargets.NormalTexture, 
+            graphics.RenderTargets.TexCoordTexture,
 
             blockMaskManager.GetBlockMaskTexture(),
             blockMaskManager.GetMaterialIDTexture(), 
@@ -242,6 +245,7 @@ internal class ChunkRenderer
         Uniforms uniforms = default;
         uniforms.tileOffset = tileLookupManager.CurrentPhase * tileLookupManager.TilesPerPhase;
         uniforms.tileCount = tileLookupManager.TilesPerPhase;
+        uniforms.phaseCount = tileLookupManager.PhaseCount;
         uniforms.ticks = (uint)Application.GetTicksNS();
         uniforms.sundir = this.sundir;
 
@@ -281,13 +285,22 @@ internal class ChunkRenderer
         {
             phaseCount = tileLookupManager.PhaseCount,
             tileCount = tileLookupManager.TilesPerPhase,
+            currentPhase = tileLookupManager.CurrentPhase,
         };
 
         graphics.CommandBuffer.PushFragmentUniformData(0, ref tileUniforms);
 
         tileRenderPass.BindFragmentSamplers(0, new TextureSamplerBinding(Game.Textures.GetTextureArray(), sampler));
-        tileRenderPass.BindFragmentStorageTextures(0, [graphics.RenderTargets.PositionTexture, graphics.RenderTargets.NormalTexture, graphics.RenderTargets.TexCoordTexture]);
-        tileRenderPass.BindFragmentStorageBuffers(0, [tileLookupManager.GetChecksums(), tileLookupManager.GetPayloads()]);
+        tileRenderPass.BindFragmentStorageTextures(0, [
+            graphics.RenderTargets.PositionTexture, 
+            graphics.RenderTargets.NormalTexture, 
+            graphics.RenderTargets.TexCoordTexture,
+            ]);
+        tileRenderPass.BindFragmentStorageBuffers(0, [
+            tileLookupManager.GetChecksums(), 
+            tileLookupManager.GetIrradiances(), 
+            tileLookupManager.GetReflections(),
+            ]);
         tileRenderPass.BindPipeline(tileRenderPipeline);
         tileRenderPass.DrawPrimitives(3, 1, 0, 0);
         tileRenderPass.End();
@@ -299,6 +312,7 @@ internal class ChunkRenderer
     {
         public uint phaseCount;
         public uint tileCount;
+        public uint currentPhase;
     }
 
     struct ChunkData

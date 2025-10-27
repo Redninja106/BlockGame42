@@ -11,7 +11,8 @@ internal class TileLookupManager
     private readonly GraphicsManager graphics;
 
     private readonly DataBuffer checksums;
-    private readonly DataBuffer payloads;
+    private readonly DataBuffer tileIrradiances;
+    private readonly DataBuffer tileReflections;
 
     public uint PhaseCount { get; }
     public uint TilesPerPhase { get; }
@@ -22,8 +23,7 @@ internal class TileLookupManager
     public uint PayloadPhaseSizeInBytes { get; }
 
     public uint CurrentFrame { get; private set; }
-    public uint CurrentPhase { get; private set; } = 1;
-
+    public uint CurrentPhase { get; private set; }
 
     public TileLookupManager(GraphicsManager graphics, uint phaseCount, uint tilesPerPhase, uint framesPerPhase)
     {
@@ -42,13 +42,17 @@ internal class TileLookupManager
             TotalRecords * sizeof(int)
             );
 
-        payloads = graphics.device.CreateDataBuffer(
+        tileIrradiances = graphics.device.CreateDataBuffer(
             DataBufferUsageFlags.GraphicsStorageRead | DataBufferUsageFlags.ComputeStorageWrite,
             TotalRecords * 4 * sizeof(int)
             );
 
-        Console.WriteLine($"tile lookup is {(checksums.Size + payloads.Size) >> 20}MB ({checksums.Size >> 20}MB checksums, {payloads.Size >> 20}MB payloads)");
+        tileReflections = graphics.device.CreateDataBuffer(
+            DataBufferUsageFlags.GraphicsStorageRead | DataBufferUsageFlags.ComputeStorageWrite,
+            tilesPerPhase * 4 * sizeof(int)
+            );
 
+        Console.WriteLine($"tile lookup: {checksums.Size >> 20}MB checksums, {tileIrradiances.Size >> 20}MB irradiances, {tileReflections.Size >> 20}MB reflections");
     }
 
     public DataBuffer GetChecksums()
@@ -56,15 +60,20 @@ internal class TileLookupManager
         return checksums;
     }
 
-    public DataBuffer GetPayloads() 
+    public DataBuffer GetIrradiances() 
     { 
-        return payloads; 
+        return tileIrradiances; 
+    }
+
+    public DataBuffer GetReflections()
+    {
+        return tileReflections;
     }
 
     public void ClearPhase(uint phase)
     {
         graphics.ClearDataBufferRange(checksums, phase * ChecksumPhaseSizeInBytes, ChecksumPhaseSizeInBytes, false);
-        graphics.ClearDataBufferRange(payloads, phase * PayloadPhaseSizeInBytes, PayloadPhaseSizeInBytes, false);
+        graphics.ClearDataBufferRange(tileIrradiances, phase * PayloadPhaseSizeInBytes, PayloadPhaseSizeInBytes, false);
     }
 
     public void PhaseTick()
@@ -85,5 +94,6 @@ internal class TileLookupManager
             ClearPhase(CurrentPhase);
         }
 
+        graphics.ClearDataBufferRange(tileReflections, 0, tileReflections.Size, false);
     }
 }

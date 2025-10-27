@@ -67,7 +67,7 @@ internal class FontPipeline : AssetPipeline
             // int y = (fontsize + 2 * spacing) * (i / glyphsPerRow);
 
             ushort glyph = font.GetGlyph(codepoints[i]);
-
+            
             float advance = font.MeasureText([glyph], out SKRect bounds);
             bounds.Right += shadow;
             bounds.Bottom += shadow;

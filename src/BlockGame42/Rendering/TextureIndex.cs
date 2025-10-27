@@ -38,6 +38,7 @@ internal class TextureIndex
             Height = 16,
             Data = new byte[4 * 16 * 16],
         };
+        data.Data.AsSpan().Fill(0);
         Empty = nextId++;
         UploadTextureData(data, Empty);
     }

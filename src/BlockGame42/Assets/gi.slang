@@ -10,7 +10,8 @@ struct MaterialData
 
 // RW Resources
 SDL_CS_RW_RESOURCE(0, RWStructuredBuffer<uint> tileChecksums);
-SDL_CS_RW_RESOURCE(1, RWStructuredBuffer<uint4> tilePayloads);
+SDL_CS_RW_RESOURCE(1, RWStructuredBuffer<uint4> tileIrradiances);
+SDL_CS_RW_RESOURCE(2, RWStructuredBuffer<uint4> tileReflections);
 
 // Samplers/Sampled Textures
 SDL_CS_SAMPLER(0, SamplerState sampler);
@@ -18,12 +19,13 @@ SDL_CS_RESOURCE(0, Texture2DArray<float4> materialTextures);
 
 SDL_CS_RESOURCE(1, Texture2D<float4> positionTarget);
 SDL_CS_RESOURCE(2, Texture2D<float4> normalTarget);
+SDL_CS_RESOURCE(3, Texture2D<float4> texCoordTarget);
 
-SDL_CS_RESOURCE(3, Texture3D<uint2> blockMasks);
-SDL_CS_RESOURCE(4, Texture3D<uint> materialIds);
+SDL_CS_RESOURCE(4, Texture3D<uint2> blockMasks);
+SDL_CS_RESOURCE(5, Texture3D<uint> materialIds);
 
 
-SDL_CS_RESOURCE(5, StructuredBuffer<MaterialData> materials)
+SDL_CS_RESOURCE(6, StructuredBuffer<MaterialData> materials)
 
 struct Uniforms
 {
@@ -32,6 +34,7 @@ struct Uniforms
     int3 blockMasksOffset;
     uint tileOffset;
     uint tileCount;
+    uint phaseCount;
     uint ticks;
 };
 
@@ -46,6 +49,7 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     float3 position = positionTarget[dispatchThreadID.xy].xyz;
     float3 normal = normalTarget[dispatchThreadID.xy].xyz;
+    float4 texCoord = texCoordTarget[dispatchThreadID.xy];
 
     random.seed = uniforms.ticks * 0x3f05aa5f +
                   (dispatchThreadID.x + 0x8523) * 0xb7e35a7d + 
@@ -87,15 +91,33 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     }
     totalColor *= (1.0 / samples);
     // totalColor = (1 - reflectiveness) * totalColor + reflectiveness * reflection_color;
-
+    
     uint idx = find_or_insert(position, normal);
-    InterlockedAdd(tilePayloads[idx].r, int(255 * totalColor.r));
-    InterlockedAdd(tilePayloads[idx].g, int(255 * totalColor.g));
-    InterlockedAdd(tilePayloads[idx].b, int(255 * totalColor.b));
-    InterlockedAdd(tilePayloads[idx].a, 1);
+    InterlockedAdd(tileIrradiances[idx].r, int(255 * totalColor.r));
+    InterlockedAdd(tileIrradiances[idx].g, int(255 * totalColor.g));
+    InterlockedAdd(tileIrradiances[idx].b, int(255 * totalColor.b));
+    InterlockedAdd(tileIrradiances[idx].a, 1);
+
+    // MaterialData material = materials[materialIds[(int3)floor(position) + uniforms.blockMasksOffset]];
+    // float2 uv = calc_face_uv(frac(position), normal);
+    float reflection = materialTextures.SampleLevel(sampler, texCoord.xyw, 0).w;
+
+    if (reflection > 0) 
+    {
+        Ray reflection_ray;
+        reflection_ray.origin = position + normal * .0001;
+        reflection_ray.direction = reflect(normalize(position - uniforms.cameraPosition.xyz), normal);
+        reflection_ray.inverseDirection = 1 / reflection_ray.direction;
+        reflection_ray.length = 64;
+
+        float3 reflect_color = reflection_color(reflection_ray);
+
+        InterlockedAdd(tileReflections[idx - uniforms.tileOffset].r, int(255 * reflect_color.r));
+        InterlockedAdd(tileReflections[idx - uniforms.tileOffset].g, int(255 * reflect_color.g));
+        InterlockedAdd(tileReflections[idx - uniforms.tileOffset].b, int(255 * reflect_color.b));
+        InterlockedAdd(tileReflections[idx - uniforms.tileOffset].a, 1);
+    }
 }
-
-
 
 uint find_or_insert(float3 position, float3 normal)
 {
@@ -106,7 +128,7 @@ uint find_or_insert(float3 position, float3 normal)
 
     uint searchIndex = hash % uniforms.tileCount;
     for (int i = 0; i < max_search; i++)
-    { 
+    {
         uint original;
         InterlockedCompareExchange(tileChecksums[uniforms.tileOffset + searchIndex], 0, checksum, original);
         if (original == 0 || original == checksum)
@@ -119,7 +141,6 @@ uint find_or_insert(float3 position, float3 normal)
 
     return 0xFFFFFFFF;
 }
-
 
 float3 ray_color(Ray ray)
 {
@@ -154,7 +175,7 @@ float3 ray_color(Ray ray)
         }
         else
         {
-            const float skystrength = .25;
+            const float skystrength = .15;
 
             // sky emission
             emission[i] += float3(skystrength); // + 0.5 * float3(.392f, .584f, .929f);
@@ -184,6 +205,120 @@ float3 ray_color(Ray ray)
         color = color * transmission[j] + emission[j];
     }
     return color;
+}
+
+float3 reflection_color(Ray ray)
+{
+    float hitT;
+    float3 hitNormal;
+    int3 hitVoxel;
+
+    float3 hitPos;
+    if (!dda(ray, hitT, hitNormal, hitVoxel))
+    {
+        const float skystrength = .15;
+        return skystrength;
+    }
+
+    hitPos = ray.at(hitT);
+
+        // uint idx = find(uniforms.tileOffset / uniforms.tileCount, hitPos, hitNormal);
+        // if (idx != 0xFFFFFFFF)
+        // {
+        //     uint4 packed_irradiance = tileIrradiances[idx];
+        //     if (packed_irradiance.w != 0)
+        //     {
+        //         return (float3(packed_irradiance.xyz) / 255.0) / packed_irradiance.w;
+        //     }
+        // }
+
+    // load material data at hit position
+    MaterialData material = materials[materialIds[hitVoxel + uniforms.blockMasksOffset]];
+    float2 uv = calc_face_uv(frac(hitPos), hitNormal);
+    float3 transmission = materialTextures.SampleLevel(sampler, float3(uv, material.transmissions[0]), 0).xyz;
+    float4 emission_and_reflectiveness = materialTextures.SampleLevel(sampler, float3(uv, material.emissions[0]), 0);
+    float3 emission = emission_and_reflectiveness.xyz;
+    float reflectiveness = emission_and_reflectiveness.w;
+
+    // emissions[order] = emission;
+    // transmissions[order] = transmission;
+    // reflecivenesses[order] = reflectiveness;
+
+    // hit is not reflective (stop reflecting!)
+    // if (reflectiveness == 0)
+    // {
+    //     break;
+    // }
+
+    // update ray for next reflection
+    // ray.direction = reflect(normalize(hitPos - ray.origin), hitNormal);
+    // ray.inverseDirection = 1 / ray.direction;
+    // ray.origin = hitPos + hitNormal * .0001;
+    // ray.length = 64;
+    
+    ray.origin = hitPos + hitNormal * 0.0001;
+    ray.direction = normalize(hitNormal + random.NextUnitVector());
+    ray.inverseDirection = 1 / ray.direction;
+    float3 color = ray_color(ray);
+
+    uint new_idx = find_or_insert(hitPos, hitNormal);
+    InterlockedAdd(tileIrradiances[new_idx].r, int(255 * color.r));
+    InterlockedAdd(tileIrradiances[new_idx].g, int(255 * color.g));
+    InterlockedAdd(tileIrradiances[new_idx].b, int(255 * color.b));
+    InterlockedAdd(tileIrradiances[new_idx].a, 1);
+
+    float4 total_irradiance = 0;
+    for (int i = 0; i < uniforms.phaseCount; i++)
+    {
+        uint idx = find(i, hitPos, hitNormal);
+
+        if (idx == 0xFFFFFFFF)
+        {
+            // emit green - not found / more than 32 hash conflicts
+            continue;
+        }
+
+        uint4 packed_irradiance = tileIrradiances[idx];
+        float3 irradiance = float3(packed_irradiance.xyz) / 255.0;
+        uint accumulatedCount = packed_irradiance.w;
+        if (accumulatedCount == 0)
+        {
+            // emit red - no illumination samples
+            continue;
+        }
+
+        total_irradiance += float4(irradiance, float(accumulatedCount));
+    }
+
+    float3 reflection_color = (total_irradiance.xyz / total_irradiance.w);
+
+    return reflection_color * transmission + emission;
+}
+
+uint find(uint phase, float3 position, float3 normal)
+{
+    uint hash, checksum;
+    get_hash_and_checksum(position, normal, hash, checksum);
+
+    uint searchIndex = hash % uniforms.tileCount;
+    for (int i = 0; i < 32; i++)
+    {
+        uint searchIndexChecksum = tileChecksums[phase * uniforms.tileCount + searchIndex];
+
+        if (searchIndexChecksum == checksum)
+        {
+            return phase * uniforms.tileCount + searchIndex;
+        }
+
+        if (searchIndexChecksum == 0)
+        {
+            return 0xFFFFFFFF;
+        }
+
+        searchIndex = pcg_hash(searchIndex) % uniforms.tileCount;
+    }
+
+    return 0xFFFFFFFF;
 }
 
 float2 calc_face_uv(float3 hitPos, float3 hitNormal)

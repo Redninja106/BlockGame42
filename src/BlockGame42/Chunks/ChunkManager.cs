@@ -20,7 +20,7 @@ internal class ChunkManager
     {
         this.graphics = graphics;
 
-        int chunks = 1;
+        int chunks = 4;
 
         for (int x = -chunks; x < chunks; x++)
         {
@@ -80,11 +80,11 @@ internal class ChunkManager
             for (int x = 0; x < Chunk.Width; x++)
             {
                 int gx = coordinates.X * Chunk.Width + x;
+                float worldHeight = (15 + 4 * float.Cos(gx * 1 / 16f) + 4 * float.Cos(gz * 1 / 16f));
 
                 for (int y = 0; y < Chunk.Height; y++)
                 {
                     int gy = coordinates.Y * Chunk.Height + y;
-                    chunk.Blocks[x, y, z] = Game.Blocks.Air;
                     //if (Occupied(gx, gy, gz))
                     //{
                     //    chunk.Blocks[x, y, z] = Game.Blocks.Stone;
@@ -110,10 +110,14 @@ internal class ChunkManager
                     //     }
                     // }
 
-                    if (gy < (15 + 4 * float.Cos(gx * 1 / 16f) + 4 * float.Cos(gz * 1 / 16f)))
+                    if (gy < worldHeight)
                     {
                         chunk.Blocks[x, y, z] = Game.Blocks.Stone;
                         chunk.BlockMasks[x, y, z] = 0xFFFFFFFFFFFFFFFF;
+                    }
+                    else
+                    {
+                        chunk.Blocks[x, y, z] = Game.Blocks.Air;
                     }
                 }
             }

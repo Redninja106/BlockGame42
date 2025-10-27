@@ -24,6 +24,8 @@ internal class Player : Entity
 
     public Camera Camera { get; } = new();
     MouseButtonFlags lastMouseButtons;
+    bool[]? lastKeyboardState;
+
     public Player(World world) : base(world)
     {
     }
@@ -122,27 +124,34 @@ internal class Player : Entity
             placementIdx %= placementArray.Length;
         }
 
+        if (keyboard[Scancode.E] && !(lastKeyboardState?[(int)Scancode.E] ?? false))
+        {
+            placementIdx++;
+            placementIdx %= placementArray.Length;
+        }
+
         if ((mouseButtons & MouseButtonFlags.Left) != 0 && (lastMouseButtons & MouseButtonFlags.Left) == 0)
         {
             Block placingBlock = placementArray[placementIdx];
             placingBlock.PlacementHandler.OnPlaceBlock(World, Camera, placingBlock);
         }
         
-
         lastMouseButtons = mouseButtons;
+        lastKeyboardState = keyboard.ToArray();
     }
 
-    string[] nameArray = ["stone", "glowstone", "dirt"];
-    Block[] placementArray = [Game.Blocks.Stone, Game.Blocks.Glowstone, Game.Blocks.Dirt];
+    string[] nameArray = ["stone", "glowstone", "dirt", "iron block"];
+    Block[] placementArray = [Game.Blocks.Stone, Game.Blocks.Glowstone, Game.Blocks.Dirt, Game.Blocks.IronBlock];
     int placementIdx = 0;
 
     public void Render()
     {
         Ray ray = new(Camera.transform.Position, Camera.transform.Forward, 100);
+        Game.gameRenderer.GUIRenderer.PushText(Game.gameRenderer.Font, nameArray[placementIdx], new(5,30), 0xFFFFFFFF);
+        
         if (World.Raycast(ray, out float t, out Coordinates hitCoords, out Coordinates normal))
         {
-            Game.gameRenderer.FontRenderer.RenderText(Game.gameRenderer.GUIRenderer, World.GetBlockReference(hitCoords).Support.ToString(), new(Game.graphics.Window.Width/2f,Game.graphics.Window.Height/2f), 0xFFFFFFFF);
-            Game.gameRenderer.FontRenderer.RenderText(Game.gameRenderer.GUIRenderer, nameArray[placementIdx], new(5,30), 0xFFFFFFFF);
+            // Game.gameRenderer.GUIRenderer.PushText(Game.gameRenderer.Font, World.GetBlockReference(hitCoords).Support.ToString(), new(Game.graphics.Window.Width/2f,Game.graphics.Window.Height/2f), 0xFFFFFFFF);
         }
     }
 

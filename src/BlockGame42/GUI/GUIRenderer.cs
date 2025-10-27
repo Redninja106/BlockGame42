@@ -19,11 +19,16 @@ internal class GUIRenderer
     DataBuffer vertexBuffer;
     TransferBuffer transferBuffer;
     Sampler sampler;
-    GUIVertex[] vertices;
-    int vertexCount;
-    Texture SolidTexture;
-    Texture? activeTexture;
+    // GUIVertex[] vertices;
+    // int vertexCount;
+    private readonly Texture solidTexture;
+    // Texture? activeTexture;
     Matrix4x4 transformMatrix;
+
+    private readonly List<DrawCommand> commands = [];
+    private readonly List<GUIVertex> vertices = [];
+
+    private DrawCommand activeCommand;
 
     public GUIRenderer(GraphicsManager graphics)
     {
@@ -32,8 +37,6 @@ internal class GUIRenderer
         uint bufferSize = (uint)(MaxVertices * Unsafe.SizeOf<GUIVertex>());
         transferBuffer = graphics.device.CreateTransferBuffer(TransferBufferUsage.Upload, bufferSize);
         vertexBuffer = graphics.device.CreateDataBuffer(DataBufferUsageFlags.Vertex, bufferSize);
-
-        vertices = new GUIVertex[MaxVertices];
 
         ColorTargetBlendState blendState = new()
         {
@@ -67,7 +70,7 @@ internal class GUIRenderer
         {
         });
 
-        SolidTexture = graphics.device.CreateTexture(new()
+        solidTexture = graphics.device.CreateTexture(new()
         {
             Format = TextureFormat.R8G8B8A8_UNorm,
             Width = 1,
@@ -85,24 +88,27 @@ internal class GUIRenderer
 
         var cmdBuffer = graphics.device.AcquireCommandBuffer();
         var copyPass = cmdBuffer.BeginCopyPass();
-        copyPass.UploadToTexture(new(tempTransferBuffer, 0, 1, 1), new TextureRegion(SolidTexture, 0, 0, 0, 0, 0, 1, 1, 1), false);
+        copyPass.UploadToTexture(new(tempTransferBuffer, 0, 1, 1), new TextureRegion(solidTexture, 0, 0, 0, 0, 0, 1, 1, 1), false);
         copyPass.End();
         cmdBuffer.Submit();
     }
 
-    public void Begin(int width, int height)
+    public void BeginFrame(int width, int height)
     {
         transformMatrix = Matrix4x4.CreateOrthographicOffCenter(0, width, height, 0, 0f, 1f);
+        activeCommand = default;
     }
 
-    public void Flush()
+    public void EndFrame()
     {
+        NewCommand();
+
         Span<GUIVertex> transferBufferData = transferBuffer.Map<GUIVertex>(true);
-        vertices.AsSpan(0, vertexCount).CopyTo(transferBufferData);
+        CollectionsMarshal.AsSpan(vertices).CopyTo(transferBufferData);
         transferBuffer.Unmap();
 
         CopyPass copy = graphics.CommandBuffer.BeginCopyPass();
-        copy.UploadToDataBuffer(new(transferBuffer), new(vertexBuffer, 0, (uint)(this.vertexCount * Unsafe.SizeOf<GUIVertex>())), false);
+        copy.UploadToDataBuffer(new(transferBuffer), new(vertexBuffer, 0, (uint)(vertices.Count * Unsafe.SizeOf<GUIVertex>())), false);
         copy.End();
 
         ColorTargetInfo mainRenderTarget = new()
@@ -117,29 +123,47 @@ internal class GUIRenderer
         Matrix4x4 transform = this.transformMatrix;
         graphics.CommandBuffer.PushVertexUniformData(0, ref transform);
 
-        pass.BindFragmentSamplers(0, [new(activeTexture ?? SolidTexture, sampler)]);
         pass.BindPipeline(pipeline);
         pass.BindVertexBuffers(0, [new(vertexBuffer)]);
+        
+        for (int i = 0; i < this.commands.Count; i++)
+        {
+            DrawCommand command = this.commands[i];
 
-        pass.DrawPrimitives((uint)vertexCount, 1, 0, 0);
+            pass.BindFragmentSamplers(0, [new(command.Texture ?? solidTexture, sampler)]);
+            pass.DrawPrimitives(command.VertexCount, 1, command.VertexOffset, 0);
+        }
 
         pass.End();
-        vertexCount = 0;
-        activeTexture = null;
+        commands.Clear();
+        vertices.Clear();
     }
 
     public void UseTexture(Texture? texture)
     {
-        if (texture != activeTexture)
+        if (texture != activeCommand.Texture)
         {
-            Flush();
-            activeTexture = texture;
+            NewCommand();
+            activeCommand.Texture = texture;
         }
+    }
+
+    private void NewCommand()
+    {
+        commands.Add(activeCommand);
+        DrawCommand newCommand = new()
+        {
+            Texture = null,
+            VertexCount = 0,
+            VertexOffset = activeCommand.VertexOffset + activeCommand.VertexCount,
+        };
+        activeCommand = newCommand;
     }
 
     public void PushVertex(GUIVertex vertex)
     {
-        vertices[vertexCount++] = vertex;
+        vertices.Add(vertex);
+        activeCommand.VertexCount++;
     }
 
     public void PushRectangle(Vector2 a, Vector2 b, uint color)
@@ -166,6 +190,25 @@ internal class GUIRenderer
         PushVertex(bottomLeft);
     }
 
+    public void PushRectangleOutline(Vector2 a, Vector2 b, Vector2 uv0, Vector2 uv1, uint color)
+    {
+        Vector2 min = Vector2.Min(a, b);
+        Vector2 max = Vector2.Max(a, b);
+
+        GUIVertex topLeft = new(new Vector2(min.X, min.Y), new Vector2(uv0.X, uv0.Y), color);
+        GUIVertex topRight = new(new Vector2(max.X, min.Y), new Vector2(uv1.X, uv0.Y), color);
+        GUIVertex bottomLeft = new(new Vector2(min.X, max.Y), new Vector2(uv0.X, uv1.Y), color);
+        GUIVertex bottomRight = new(new Vector2(max.X, max.Y), new Vector2(uv1.X, uv1.Y), color);
+
+        PushVertex(topLeft);
+        PushVertex(topRight);
+        PushVertex(bottomLeft);
+
+        PushVertex(topRight);
+        PushVertex(bottomRight);
+        PushVertex(bottomLeft);
+    }
+
     public void PushLine(Vector2 from, Vector2 to, uint color, float thickness)
     {
         Vector2 direction = Vector2.Normalize(to - from);
@@ -174,8 +217,8 @@ internal class GUIRenderer
 
         GUIVertex fromUpper = new(from + perp - para, new Vector2(0, 0), color);
         GUIVertex fromLower = new(from - perp - para, new Vector2(1, 0), color);
-        GUIVertex toUpper   = new(to +   perp + para, new Vector2(0, 1), color);
-        GUIVertex toLower   = new(to -   perp + para, new Vector2(1, 1), color);
+        GUIVertex toUpper   = new(to   + perp + para, new Vector2(0, 1), color);
+        GUIVertex toLower   = new(to   - perp + para, new Vector2(1, 1), color);
 
         PushVertex(fromUpper);
         PushVertex(fromLower);
@@ -184,6 +227,20 @@ internal class GUIRenderer
         PushVertex(fromLower);
         PushVertex(toLower);
         PushVertex(toUpper);
+    }
+
+    public Vector2 PushText(Font font, string text, Vector2 position, uint color)
+    {
+        UseTexture(font.Atlas);
+        foreach (char c in text)
+        {
+            Font.Glyph glyph = font.GetGlyph(c);
+
+            PushRectangle(position + glyph.TopLeft, position + glyph.BottomRight, glyph.UV0, glyph.UV1, color);
+            position.X += glyph.Advance;
+        }
+
+        return position;
     }
 
     public void PushRectangleOutline(Vector2 a, Vector2 b, uint color, float thickness)
@@ -203,5 +260,12 @@ internal class GUIRenderer
         PushVertex(topRight);
         PushVertex(bottomRight);
         PushVertex(bottomLeft);
+    }
+
+    struct DrawCommand
+    {
+        public Texture? Texture;
+        public uint VertexOffset;
+        public uint VertexCount;
     }
 }

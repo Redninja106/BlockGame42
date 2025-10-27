@@ -6,6 +6,8 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace BlockGame42.Assets.Pipeline;
 internal class TexturePipeline : AssetPipeline
@@ -15,12 +17,12 @@ internal class TexturePipeline : AssetPipeline
 
     public unsafe override void Build(AssetBuildContext context)
     {
-        SKBitmap bitmap = SKBitmap.Decode(File.ReadAllBytes(context.InputFile));
-        bitmap = bitmap.Copy(SKColorType.Rgba8888);
+        Image<Rgba32> image = Image.Load<Rgba32>(File.ReadAllBytes(context.InputFile));
 
-        nint pixelsPtr = bitmap.GetPixels(out nint length);
-        Span<byte> pixelData = new Span<byte>((void*)pixelsPtr, (int)length);
-        byte[] finalData = EncodeImage(bitmap.Width, bitmap.Height, pixelData);
+        byte[] pixelData = new byte[image.Width * image.Height * 4];
+        image.CopyPixelDataTo(pixelData);
+        byte[] finalData = EncodeImage(image.Width, image.Height, pixelData);
+        Console.WriteLine(string.Join(",", pixelData.ToArray()));
 
         File.WriteAllBytes(context.GetOutputFilePath(".texture"), finalData);
     }

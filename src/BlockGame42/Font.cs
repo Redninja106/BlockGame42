@@ -3,6 +3,7 @@ using BlockGame42.Rendering;
 using SDL.GPU;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Text;
@@ -11,44 +12,21 @@ using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 
 namespace BlockGame42;
-internal class FontRenderer
-{
-    private Texture fontAtlas;
-    private FontInfo fontInfo; 
 
-    public FontRenderer(GraphicsManager graphics, IAssetSource assets, string fontName)
-    {
-        this.fontInfo = new FontInfo(assets, fontName);
-        fontAtlas = graphics.LoadTexture(fontName);
-    }
-
-    public Vector2 RenderText(GUIRenderer guiRenderer, string text, Vector2 position, uint color)
-    {
-        guiRenderer.UseTexture(this.fontAtlas);
-        foreach (char c in text)
-        {
-            FontInfo.Glyph glyph = fontInfo.GetGlyph(c);
-
-            guiRenderer.PushRectangle(position + glyph.TopLeft, position + glyph.BottomRight, glyph.UV0, glyph.UV1, color);
-            position.X += glyph.Advance;
-        }
-
-        return position;
-    }
-
-}
-
-class FontInfo
+class Font
 {
     public string FontName { get; }
-
-    private Glyph?[] glyphs;
 
     public float Ascent { get; }
     public float Descent { get; }
     public float Leading { get; }
 
-    public FontInfo(IAssetSource assets, string fontName)
+    public Texture Atlas { get; }
+
+
+    private Glyph?[] glyphs;
+
+    public Font(GraphicsManager graphics, IAssetSource assets, string fontName)
     {
         this.FontName = fontName;
 
@@ -79,6 +57,8 @@ class FontInfo
 
             glyphs[int.Parse(key.Name, NumberStyles.HexNumber)] = glyph;
         }
+
+        Atlas = graphics.LoadTexture(fontName);
     }
 
     public Glyph GetGlyph(char c)
@@ -89,6 +69,20 @@ class FontInfo
         }
 
         return glyphs[c] ?? glyphs[0]!;
+    }
+
+    public Extent Measure(ReadOnlySpan<char> text)
+    {
+        Vector2 position = Vector2.Zero;
+        Extent result = default;
+        for (int i = 0; i < text.Length; i++)
+        {
+            Glyph glyph = GetGlyph(text[i]);
+            Extent glyphExtent = new(position + glyph.TopLeft, position + glyph.BottomRight);
+            result = Extent.Union(result, glyphExtent);
+            position.X += glyph.Advance;
+        }
+        return result;
     }
 
     public class Glyph

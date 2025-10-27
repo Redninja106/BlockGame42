@@ -128,6 +128,7 @@ class Game : Application
     {
         graphics.AcquireCommandBuffer();
 
+        float framerate = 1f / deltaTime;
         deltaTime = float.Min(deltaTime, 1 / 30f);
 
         accumulatedTickTime += deltaTime;
@@ -140,7 +141,7 @@ class Game : Application
 
         while (accumulatedTickTime > 1 / 20f)
         {
-            window.SetTitle($"Block Game - {1f / deltaTime}FPS");
+            window.SetTitle($"Block Game - {framerate:N}FPS");
             accumulatedTickTime -= 1 / 20f;
             world.Tick();
         }
@@ -194,7 +195,9 @@ class GameRenderer(GraphicsManager graphics, IAssetSource assets, World world, P
     public ChunkRenderer ChunkRenderer { get; } = new(graphics);
     public GUIRenderer GUIRenderer { get; } = new(graphics);
     public OverlayRenderer OverlayRenderer { get; } = new(graphics);
-    public FontRenderer FontRenderer { get; } = new(graphics, assets, "SpaceGrotesk-Regular");
+    public Font Font { get; } = new(graphics, assets, "SpaceGrotesk-Regular");
+
+    public Viewport Viewport { get; } = new();
 
     public void Render()
     {
@@ -213,12 +216,12 @@ class GameRenderer(GraphicsManager graphics, IAssetSource assets, World world, P
         
         OverlayRenderer.Flush();
 
-        GUIRenderer.Begin(world.Graphics.Window.Width, world.Graphics.Window.Height);
+        GUIRenderer.BeginFrame(world.Graphics.Window.Width, world.Graphics.Window.Height);
 
         DrawCrosshair();
         Game.player.Render();
 
-        GUIRenderer.Flush();
+        GUIRenderer.EndFrame();
     }
 
     void DrawCrosshair()

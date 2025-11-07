@@ -23,20 +23,26 @@ internal class World
     public World(GraphicsManager graphics)
     {
         this.graphics = graphics;
-        chunks = new(graphics);
+        chunks = new(this, graphics);
+        chunks.Initialize();
 
         foreach (var (chunkCoords, (chunk, mesh)) in chunks.chunkMap)
         {
+            Timer timer = Timer.Start();
+
             for (int y = 0; y < Chunk.Height; y++)
             {
                 for (int z = 0; z < Chunk.Depth; z++)
                 {
                     for (int x = 0; x < Chunk.Width; x++)
                     {
-                        UpdateSupport(GetBlockReference(chunkCoords * Chunk.Size + new Coordinates(x, y, z)));
+                        //UpdateSupport(GetBlockReference(chunkCoords * Chunk.Size + new Coordinates(x, y, z)));
                     }
                 }
             }
+
+            Console.WriteLine($"support update of chunk {chunkCoords} took {timer.ElapsedMilliseconds()}ms");
+
         }
     }
 
@@ -52,11 +58,12 @@ internal class World
 
         if (chunk == null)
         {
-            return new BlockReference(this, chunkCoordinates, worldCoordinates, ref nullBlock, ref nullBlockState, ref nullSupport, ref nullMask);
+            return new BlockReference(this, null, chunkCoordinates, worldCoordinates, ref nullBlock, ref nullBlockState, ref nullSupport, ref nullMask);
         }
 
         return new BlockReference(
             this,
+            chunk,
             chunkCoordinates,
             worldCoordinates,
             ref chunk.Blocks[localCoordinates],
@@ -196,14 +203,14 @@ internal class World
     {
         BlockReference blockRef = GetBlockReference(coordinates);
         
-        blockRef.Block = block;
+        blockRef.Prototype = block;
         blockRef.State = state;
         blockRef.Mask = block.Model.GetVolumeMask(state);
 
-        if (blockRef.GetChunk() is Chunk chunk) 
+        if (blockRef.Chunk != null) 
         { 
-            chunk.Blocks.Stale = true;
-            chunk.BlockMasks.Stale = true;
+            blockRef.Chunk.Blocks.Stale = true;
+            blockRef.Chunk.BlockMasks.Stale = true;
         }
 
         UpdateSupport(blockRef);
@@ -213,9 +220,9 @@ internal class World
         {
             var neighbor = blockRef.Offset(ChunkMesh.forwardDirs[i]);
             UpdateBlock(neighbor);
-            if (neighbor.GetChunk() is Chunk neighborChunk)
+            if (neighbor.Chunk != null)
             {
-                neighborChunk.Blocks.Stale = true;
+                neighbor.Chunk.Blocks.Stale = true;
             }
         }
         return true;
@@ -284,13 +291,13 @@ internal class World
 
     public void UpdateBlock(in BlockReference block)
     {
-        block.Block.OnUpdate(this, in block);
+        block.Prototype.OnUpdate(this, in block);
         UpdateSupport(block);
     }
 
     public void UpdateSupport(in BlockReference block, bool weak = false)
     {
-        if (block.Block == Game.Blocks.Air)
+        if (block.Prototype == Game.Blocks.Air)
         {
             return;
         }
@@ -310,16 +317,16 @@ internal class World
             
             byte blockStrength = i switch
             {
-                4 => block.Block.Strength.Tension,
-                5 => block.Block.Strength.Compression,
-                _ => block.Block.Strength.Lateral,
+                4 => block.Prototype.Strength.Tension,
+                5 => block.Prototype.Strength.Compression,
+                _ => block.Prototype.Strength.Lateral,
             };
 
             byte neighborStrength = i switch
             {
-                4 => neighbor.Block.Strength.Tension,
-                5 => neighbor.Block.Strength.Compression,
-                _ => neighbor.Block.Strength.Lateral,
+                4 => neighbor.Prototype.Strength.Tension,
+                5 => neighbor.Prototype.Strength.Compression,
+                _ => neighbor.Prototype.Strength.Lateral,
             };
 
             byte transferStrength = byte.Min(blockStrength, neighbor.Support);

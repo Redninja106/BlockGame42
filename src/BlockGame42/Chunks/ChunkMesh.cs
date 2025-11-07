@@ -19,10 +19,12 @@ internal class ChunkMesh
     private readonly GraphicsManager graphics;
     public DataBuffer VertexBuffer;
     public int VertexCount;
+    private World world;
 
-    public ChunkMesh(GraphicsManager graphics)
+    public ChunkMesh(GraphicsManager graphics, World world)
     {
         this.graphics = graphics;
+        this.world = world;
 
         VertexBuffer = this.graphics.device.CreateDataBuffer(DataBufferUsageFlags.Vertex, BufferSizeIncrement);
     }
@@ -46,6 +48,7 @@ internal class ChunkMesh
         0b1111,
         // 0b0000, 0b1000, 0b0100, 0b1100, 0b0010, 0b1010, 0b0110, 0b1110, 0b0001, 0b1001, 0b0101, 0b1101, 0b0011, 0b1011, 0b0111, 0b1111,
         ];
+
     public static BlockFaceMask FlipMaskHorizontal(BlockFaceMask mask)
     {
         BlockFaceMask result = 0;
@@ -108,30 +111,36 @@ internal class ChunkMesh
         .5f,
         ];
 
-    static void EmitBlockFace(in ChunkNeighborhood neighborhood, BlockMeshBuilder mesh, Coordinates coords, BlockModel model, BlockState state, Direction direction)
+    static void EmitBlockFace(BlockMeshBuilder mesh, BlockReference block, Direction direction)
     {
         // Block block = neighborhood.Center.Blocks[coords];
         // BlockModel model = block.Model;
 
         Direction inverseDirection = directionInverses[(int)direction];
 
-        if (model.GetFaceMask(state, direction) == BlockFaceMask.Empty)
+        if (block.Prototype.Model.GetFaceMask(block.State, direction) == BlockFaceMask.Empty)
         {
             return; 
         }
-        
-        Coordinates coordsOffset = coords + forwardDirs[(int)direction];
-        Chunk? chunk = neighborhood.At(coordsOffset, out var blockOffset);
-        
-        if (chunk == null)
-        {
-            return;
-        }
-        
-        Block neighborBlock = chunk.Blocks[blockOffset];
-        BlockState neighborState = chunk.BlockStates[blockOffset];
 
-        BlockFaceMask visibleFaces = model.GetFaceMask(state, direction) & ~FlipMaskHorizontal(neighborBlock.Model.GetFaceMask(neighborState, inverseDirection));
+        // Coordinates coordsOffset = block. + forwardDirs[(int)direction];
+        // Chunk? chunk = neighborhood.At(coordsOffset, out var blockOffset);
+
+        // if (chunk == null)
+        // {
+        //     return;
+        // }
+
+        BlockReference neighborBlock = block.Offset(forwardDirs[(int)direction]);// chunk.Blocks[blockOffset];
+
+        BlockFaceMask faceMask = block.Prototype.Model.GetFaceMask(block.State, direction);
+        BlockFaceMask neighborMask = neighborBlock.Prototype.Model.GetFaceMask(neighborBlock.State, inverseDirection);
+        if ((int)direction < 4)
+        {
+            neighborMask = FlipMaskHorizontal(neighborMask);
+        }
+
+        BlockFaceMask visibleFaces = faceMask & ~neighborMask;
 
         if (visibleFaces == 0)
         {
@@ -145,19 +154,19 @@ internal class ChunkMesh
         float ao = aos[(int)direction];
         if (visibleFaces == BlockFaceMask.Full)
         {
-            mesh.AppendBlockFace(offset, right, up, normal, model.GetMaterial(state).Data.Transmission[direction], model.GetMaterial(state).Data.Emission[direction]);
+            mesh.AppendBlockFace(offset, right, up, normal, block.Prototype.Model.GetMaterial(block.State).Data.Transmission[direction], block.Prototype.Model.GetMaterial(block.State).Data.Emission[direction]);
         }
         else
         {
-            mesh.AppendPartialBlockFace(visibleFaces, offset.ToVector(), right.ToVector(), up.ToVector(), normal.ToVector(), model.GetMaterial(state).Data.Transmission[direction], model.GetMaterial(state).Data.Emission[direction]);
+            mesh.AppendPartialBlockFace(visibleFaces, offset.ToVector(), right.ToVector(), up.ToVector(), normal.ToVector(), block.Prototype.Model.GetMaterial(block.State).Data.Transmission[direction], block.Prototype.Model.GetMaterial(block.State).Data.Emission[direction]);
             //mesh.AppendPartialBlockFace(visibleFaces, neighborhood, coords, offset, right, up, model.TextureIDs[direction], ao);
         }
     }
 
-    public void Build(in ChunkNeighborhood neighborhood)
+    public void Build(Chunk chunk, Coordinates chunkCoordinates)
     {
+        // Timer start = Timer.Start();
         scoped BlockMeshBuilder mesh = new();
-        mesh.neighborhood = ref neighborhood;
 
         for (int y = 0; y < Chunk.Height; y++)
         {
@@ -165,95 +174,28 @@ internal class ChunkMesh
             {
                 for (int x = 0; x < Chunk.Width; x++)
                 {
-                    Coordinates coords = new(x, y, z);
-                    mesh.coordinates = coords;
+                    Coordinates localCoordinates = new(x, y, z);
+                    mesh.coordinates = localCoordinates;
 
-                    Block block = neighborhood.Center.Blocks[coords];
-                    BlockState state = neighborhood.Center.BlockStates[coords];
+                    BlockReference block = world.GetBlockReference(chunkCoordinates * Chunk.Size + localCoordinates);
 
-                    EmitBlockFace(neighborhood, mesh, coords, block.Model, state, Direction.East);
-                    EmitBlockFace(neighborhood, mesh, coords, block.Model, state, Direction.South);
-                    EmitBlockFace(neighborhood, mesh, coords, block.Model, state, Direction.West);
-                    EmitBlockFace(neighborhood, mesh, coords, block.Model, state, Direction.North);
-                    EmitBlockFace(neighborhood, mesh, coords, block.Model, state, Direction.Up);
-                    EmitBlockFace(neighborhood, mesh, coords, block.Model, state, Direction.Down);
+                    EmitBlockFace(mesh, block, Direction.East);
+                    EmitBlockFace(mesh, block, Direction.South);
+                    EmitBlockFace(mesh, block, Direction.West);
+                    EmitBlockFace(mesh, block, Direction.North);
+                    EmitBlockFace(mesh, block, Direction.Up);
+                    EmitBlockFace(mesh, block, Direction.Down);
 
-                    block.Model.AddInternalFaces(state, mesh);
-                    //Coordinates coordsEast = coords + new Coordinates(1, 0, 0);
-                    //if (model.Faces[Direction.East] != BlockFaceMask.Empty)
-                    //{
-                    //    Block? blockEast = neighborhood.At(coordsEast, out var offset)?.Blocks[offset];
-
-                    //    if (blockEast != null && model.Faces[Direction.East] != blockEast.Model.Faces[Direction.West])
-                    //    {
-                    //        // BlockFaceMask exposedFace = model.Faces & ~blockEast.Model.Faces[Direction.West];
-
-                    //        mesh.AppendBlockFace(neighborhood, coords, new Coordinates(1, 1, 1), new(0, 0, -1), new(0, -1, 0), model.TextureIDs[Direction.East], .6f);
-                    //    }
-                    //}
-
-                    //Coordinates coordsSouth = coords + new Coordinates(0, 0, 1);
-                    //if (model.Faces[Direction.South] != BlockFaceMask.Empty)
-                    //{
-                    //    Block? blockSouth = neighborhood.At(coordsSouth, out var offset)?.Blocks[offset];
-
-                    //    if (blockSouth != null && model.Faces[Direction.South] != blockSouth.Model.Faces[Direction.North])
-                    //    {
-                    //        mesh.AppendBlockFace(neighborhood, coords, new Coordinates(0, 1, 1), new(1, 0, 0), new(0, -1, 0), model.TextureIDs[Direction.South], .7f);
-                    //    }
-                    //}
-
-                    //Coordinates coordsWest = coords + new Coordinates(-1, 0, 0);
-                    //if (model.Faces[Direction.West] != BlockFaceMask.Empty)
-                    //{
-                    //    Block? blockWest = neighborhood.At(coordsWest, out var offset)?.Blocks[offset];
-
-                    //    if (blockWest != null && model.Faces[Direction.West] != blockWest.Model.Faces[Direction.East])
-                    //    {
-                    //        mesh.AppendBlockFace(neighborhood, coords, new Coordinates(0, 1, 0), new(0, 0, 1), new(0, -1, 0), model.TextureIDs[Direction.West], .8f);
-                    //    }
-                    //}
-
-                    //Coordinates coordsNorth = coords + new Coordinates(0, 0, -1);
-                    //if (model.Faces[Direction.North] != BlockFaceMask.Empty)
-                    //{
-                    //    Block? blockNorth = neighborhood.At(coordsNorth, out var offset)?.Blocks[offset];
-
-                    //    if (blockNorth != null && model.Faces[Direction.North] != blockNorth.Model.Faces[Direction.South])
-                    //    {
-                    //        mesh.AppendBlockFace(neighborhood, coords, new Coordinates(1, 1, 0), new(-1, 0, 0), new(0, -1, 0), model.TextureIDs[Direction.North], .9f);
-                    //    }
-                    //}
-
-
-                    //Coordinates coordsAbove = coords + new Coordinates(0, 1, 0);
-                    //if (model.Faces[Direction.Up] != BlockFaceMask.Empty)
-                    //{
-                    //    Block? blockAbove = neighborhood.At(coordsAbove, out var offset)?.Blocks[offset];
-
-                    //    if (blockAbove == null || model.Faces[Direction.Up] != blockAbove.Model.Faces[Direction.Down])
-                    //    {
-                    //        mesh.AppendBlockFace(neighborhood, coords, new Coordinates(0, 1, 0), new(1, 0, 0), new(0, 0, 1), model.TextureIDs[Direction.Up], 1f);
-                    //    }
-                    //}
-
-                    //Coordinates coordsBelow = coords + new Coordinates(0, -1, 0);
-                    //if (model.Faces[Direction.Down] != BlockFaceMask.Empty)
-                    //{
-                    //    Block? blockBelow = neighborhood.At(coordsBelow, out var offset)?.Blocks[offset];
-
-                    //    if (blockBelow == null || model.Faces[Direction.Down] != blockBelow.Model.Faces[Direction.Up])
-                    //    {
-                    //        mesh.AppendBlockFace(neighborhood, coords, new Coordinates(0, 0, 1), new(1, 0, 0), new(0, 0, -1), model.TextureIDs[Direction.Down], .5f);
-                    //    }
-                    //}
-
+                    block.Prototype.Model.AddInternalFaces(block.State, mesh);
                 }
             }
         }
 
         UploadVertices(CollectionsMarshal.AsSpan(mesh.vertices));
         VertexCount = mesh.vertices.Count;
+
+        //Console.WriteLine($"meshing chunk {chunkCoordinates} took {start.ElapsedMilliseconds()}ms");
+        // return start.ElapsedMilliseconds();
     }
 
     private int RoundToIncrement(int size)
@@ -295,7 +237,7 @@ internal class ChunkMesh
 ref struct BlockMeshBuilder
 {
     public List<MinimizedChunkVertex> vertices;
-    public ref readonly ChunkNeighborhood neighborhood;
+    // public ref readonly ChunkNeighborhood neighborhood;
     public Coordinates coordinates;
 
     public void AppendFace(Vector3 offset, Vector3 right, Vector3 up, Vector2 uvOffset, Vector2 uvRight, Vector2 uvUp, uint textureId, uint emissionId)
@@ -495,5 +437,22 @@ ref struct BlockMeshBuilder
         }
 
         return 1;
+    }
+}
+
+static class DirectionExtensions
+{
+    public static Direction Inverse(this Direction direction)
+    {
+        return direction switch
+        {
+            Direction.East => Direction.West,
+            Direction.South => Direction.North,
+            Direction.West => Direction.East,
+            Direction.North => Direction.South,
+            Direction.Up => Direction.Down,
+            Direction.Down => Direction.Up,
+            _ => default
+        };
     }
 }

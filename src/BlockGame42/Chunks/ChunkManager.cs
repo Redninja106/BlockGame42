@@ -14,19 +14,25 @@ internal class ChunkManager
 {
     private GraphicsManager graphics;
     public Dictionary<Coordinates, (Chunk, ChunkMesh)> chunkMap = [];
+    private World world;
+    private WorldGenerator generator;
 
-
-    public ChunkManager(GraphicsManager graphics)
+    public ChunkManager(World world, GraphicsManager graphics)
     {
+        this.world = world;
         this.graphics = graphics;
+        generator = new(world);
+    }
 
-        int chunks = 4;
+    public void Initialize()
+    {
+        int chunks = 8;
 
         for (int x = -chunks; x < chunks; x++)
         {
             for (int z = -chunks; z < chunks; z++)
             {
-                for (int y = 0; y < chunks; y++)
+                for (int y = 0; y < 1; y++)
                 {
                     LoadOrCreateChunk(new(x, y, z));
                 }
@@ -48,7 +54,7 @@ internal class ChunkManager
         {
             if (chunk.Blocks.Stale)
             {
-                mesh.Build(GetNeighborhood(coords));
+                mesh.Build(chunk, coords);
                 chunk.Blocks.Stale = false;
             }
         }
@@ -74,65 +80,87 @@ internal class ChunkManager
     {
         Chunk chunk = new Chunk();
         
-        for (int z = 0; z < Chunk.Depth; z++)
-        {
-            int gz = coordinates.Z * Chunk.Depth + z;
-            for (int x = 0; x < Chunk.Width; x++)
-            {
-                int gx = coordinates.X * Chunk.Width + x;
-                float worldHeight = (15 + 4 * float.Cos(gx * 1 / 16f) + 4 * float.Cos(gz * 1 / 16f));
+        //for (int z = 0; z < Chunk.Depth; z++)
+        //{
+        //    int gz = coordinates.Z * Chunk.Depth + z;
+        //    for (int x = 0; x < Chunk.Width; x++)
+        //    {
+        //        int gx = coordinates.X * Chunk.Width + x;
+        //        float worldHeight = (15 + 4 * float.Cos(gx * 1 / 16f) + 4 * float.Cos(gz * 1 / 16f));
 
-                for (int y = 0; y < Chunk.Height; y++)
-                {
-                    int gy = coordinates.Y * Chunk.Height + y;
-                    //if (Occupied(gx, gy, gz))
-                    //{
-                    //    chunk.Blocks[x, y, z] = Game.Blocks.Stone;
-                    //    chunk.BlockStates[x, y, z].Raw = 0x00000000FFFFFFFF;
-                    //}
+        //        for (int y = 0; y < Chunk.Height; y++)
+        //        {
+        //            int gy = coordinates.Y * Chunk.Height + y;
+        //            //if (Occupied(gx, gy, gz))
+        //            //{
+        //            //    chunk.Blocks[x, y, z] = Game.Blocks.Stone;
+        //            //    chunk.BlockStates[x, y, z].Raw = 0x00000000FFFFFFFF;
+        //            //}
 
-                    // for (int by = 0; by < 2; by++)
-                    // {
-                    //     for (int bz = 0; bz < 2; bz++)
-                    //     {
-                    //         for (int bx = 0; bx < 2; bx++)
-                    //         {
-                    //             float bitx = gx + bx * .5f + .25f;
-                    //             float bity = gy + by * .5f + .25f;
-                    //             float bitz = gz + bz * .5f + .25f;
-                    //             float h = (15 + 4 * float.Cos(bitx * 1/16f) + 4 * float.Cos(bitz * 1/16f));
-                    //             if (bity < h)
-                    //             {
-                    //                 chunk.Blocks[x, y, z] = Game.Blocks.Stone;
-                    //                 chunk.BlockStates[x, y, z].DynamicBlock[(by << 2) + (bz << 1) + bx] = true;
-                    //             }
-                    //         }
-                    //     }
-                    // }
+        //            // for (int by = 0; by < 2; by++)
+        //            // {
+        //            //     for (int bz = 0; bz < 2; bz++)
+        //            //     {
+        //            //         for (int bx = 0; bx < 2; bx++)
+        //            //         {
+        //            //             float bitx = gx + bx * .5f + .25f;
+        //            //             float bity = gy + by * .5f + .25f;
+        //            //             float bitz = gz + bz * .5f + .25f;
+        //            //             float h = (15 + 4 * float.Cos(bitx * 1/16f) + 4 * float.Cos(bitz * 1/16f));
+        //            //             if (bity < h)
+        //            //             {
+        //            //                 chunk.Blocks[x, y, z] = Game.Blocks.Stone;
+        //            //                 chunk.BlockStates[x, y, z].DynamicBlock[(by << 2) + (bz << 1) + bx] = true;
+        //            //             }
+        //            //         }
+        //            //     }
+        //            // }
 
-                    if (gy < worldHeight)
-                    {
-                        chunk.Blocks[x, y, z] = Game.Blocks.Stone;
-                        chunk.BlockMasks[x, y, z] = 0xFFFFFFFFFFFFFFFF;
-                    }
-                    else
-                    {
-                        chunk.Blocks[x, y, z] = Game.Blocks.Air;
-                    }
-                }
-            }
-        }
+        //            if (gy < worldHeight)
+        //            {
+        //                chunk.Blocks[x, y, z] = Game.Blocks.Stone;
+        //                chunk.BlockMasks[x, y, z] = 0xFFFFFFFFFFFFFFFF;
+        //            }
+        //            else
+        //            {
+        //                chunk.Blocks[x, y, z] = Game.Blocks.Air;
+        //            }
+        //        }
+        //    }
+        //}
 
-
-        ChunkMesh mesh = new(graphics);
+        ChunkMesh mesh = new(graphics, world);
         chunkMap[coordinates] = (chunk, mesh);
+
+        generator.GenerateChunk(coordinates, chunk);
     }
 
     public void Tick()
     {
+        int renderDistance = 3;
+
         foreach (var (pos, (chunk, mesh)) in chunkMap)
         {
+            if (Vector3.Distance(pos.ToVector(), Game.player.Transform.Position / Chunk.SizeVector) > renderDistance)
+            {
+                UnloadChunk(pos);
+                continue;
+            }
+
             chunk.Tick();
         }
+
+        for (int x = -renderDistance; x < renderDistance; x++)
+        {
+            for (int y = -renderDistance; y < renderDistance; y++)
+            {
+
+            }
+        }
+    }
+
+    private void UnloadChunk(Coordinates coordinates)
+    {
+
     }
 }

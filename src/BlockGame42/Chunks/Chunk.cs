@@ -15,6 +15,10 @@ internal class Chunk
     public const int Height = 32;
     public const int Depth = 32;
 
+    public const int WidthBits = 5;
+    public const int HeightBits = 5;
+    public const int DepthBits = 5;
+
     public static readonly Vector3 SizeVector = new(Width, Height, Depth);
     public static readonly Coordinates Size = new(Width, Height, Depth);
 
@@ -30,6 +34,7 @@ internal class Chunk
     public List<Entity> Entities { get; set; } = new();
 
     public int[,] HighestPoints { get; } = new int[Width, Depth];
+
 
     // public ChunkSparseAttribute<Inventory> Inventories { get; } = new();
     // public ChunkListAttribute<Entity> Entities { get; } = new();
@@ -57,19 +62,18 @@ internal class Chunk
         return Coordinates.Floor(chunkPosition);
     }
 
-    public static Coordinates BlockToChunkCoordinates(Coordinates blockCoordinates)
+    public static Coordinates WorldToChunkCoordinates(Coordinates worldCoordinates)
     {
-        return Coordinates.Floor(blockCoordinates.ToVector() / SizeVector);
+        return new(
+            worldCoordinates.X >> WidthBits,
+            worldCoordinates.Y >> HeightBits,
+            worldCoordinates.Z >> DepthBits
+        );
     }
 
     public static void DecomposeCoordinates(Coordinates worldCoordinates, out Coordinates chunkCoordinates, out Coordinates localCoordinates)
     {
-        Vector3 chunkPosition = worldCoordinates.ToVector() / SizeVector;
-        chunkPosition.X = float.Floor(chunkPosition.X);
-        chunkPosition.Y = float.Floor(chunkPosition.Y);
-        chunkPosition.Z = float.Floor(chunkPosition.Z);
-        chunkCoordinates = Coordinates.Floor(chunkPosition);
-
+        chunkCoordinates = WorldToChunkCoordinates(worldCoordinates);
         localCoordinates = worldCoordinates - chunkCoordinates * Chunk.Size;
     }
 

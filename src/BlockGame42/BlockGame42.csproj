@@ -7,6 +7,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DefineConstants>$(DefineConstants);PROFILING</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <Content Include="Assets\**\*" />
   </ItemGroup>
@@ -24,6 +28,6 @@
 	</ItemGroup>
 	
   <Target Name="PostBuild" BeforeTargets="PostBuildEvent">
-    <Exec Command="&quot;$(SolutionDir)\src\BlockGame42.Assets.Pipeline\bin\Debug\net9.0\BlockGame42.Assets.Pipeline.exe&quot; $(ProjectDir)Assets $(OutDir)Assets" />
+    <Exec Command="&quot;$(SolutionDir)\src\BlockGame42.Assets.Pipeline\bin\$(Configuration)\net9.0\BlockGame42.Assets.Pipeline.exe&quot; $(ProjectDir)Assets $(OutDir)Assets" />
   </Target>
 </Project>

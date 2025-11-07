@@ -87,7 +87,7 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
         sample_ray.inverseDirection = 1 / sample_ray.direction;
         sample_ray.length = 64;
         
-        totalColor += ray_color(sample_ray);
+        totalColor += ray_color(sample_ray, normal);
     }
     totalColor *= (1.0 / samples);
     // totalColor = (1 - reflectiveness) * totalColor + reflectiveness * reflection_color;
@@ -142,7 +142,7 @@ uint find_or_insert(float3 position, float3 normal)
     return 0xFFFFFFFF;
 }
 
-float3 ray_color(Ray ray)
+float3 ray_color(Ray ray, float3 normal)
 {
     const int MaxBounces = 3;
     
@@ -175,7 +175,7 @@ float3 ray_color(Ray ray)
         }
         else
         {
-            const float skystrength = .15;
+            const float skystrength = .1;
 
             // sky emission
             emission[i] += float3(skystrength); // + 0.5 * float3(.392f, .584f, .929f);
@@ -185,7 +185,7 @@ float3 ray_color(Ray ray)
 
     // sun emission
     const float sunfuzz = 0.005;
-    const float sunstrength = 1.00;
+    const float sunstrength = .9;
 
     Ray sunRay;
     sunRay.origin = ray.origin;
@@ -195,7 +195,7 @@ float3 ray_color(Ray ray)
 
     if (!dda(sunRay, hitT, hitNormal, hitVoxel))
     {
-        float sunbrightness = dot(sunRay.direction, normalize(uniforms.sundir.xyz));
+        float sunbrightness = dot(sunRay.direction, normal) * dot(sunRay.direction, normalize(uniforms.sundir.xyz));
         emission[0] += float3(sunstrength * max(0, sunbrightness));
     }
 
@@ -259,7 +259,7 @@ float3 reflection_color(Ray ray)
     ray.origin = hitPos + hitNormal * 0.0001;
     ray.direction = normalize(hitNormal + random.NextUnitVector());
     ray.inverseDirection = 1 / ray.direction;
-    float3 color = ray_color(ray);
+    float3 color = ray_color(ray, hitNormal);
 
     uint new_idx = find_or_insert(hitPos, hitNormal);
     InterlockedAdd(tileIrradiances[new_idx].r, int(255 * color.r));

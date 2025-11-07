@@ -151,7 +151,7 @@ internal class Player : Entity
         
         if (World.Raycast(ray, out float t, out Coordinates hitCoords, out Coordinates normal))
         {
-            // Game.gameRenderer.GUIRenderer.PushText(Game.gameRenderer.Font, World.GetBlockReference(hitCoords).Support.ToString(), new(Game.graphics.Window.Width/2f,Game.graphics.Window.Height/2f), 0xFFFFFFFF);
+            Game.gameRenderer.GUIRenderer.PushText(Game.gameRenderer.Font, World.GetBlockReference(hitCoords).Support.ToString(), new(Game.graphics.Window.Width/2f,Game.graphics.Window.Height/2f), 0xFFFFFFFF);
         }
     }
 

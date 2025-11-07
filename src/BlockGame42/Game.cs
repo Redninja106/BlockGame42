@@ -24,11 +24,13 @@ class Game : Application
 
     IAssetSource assets = null!;
     public static GraphicsManager graphics = null!;
-    World world;
+    private World world;
     public static Player player = null!;
     public static GameRenderer gameRenderer = null!;
 
     public static float TimeStep = 1 / 20f;
+
+    public static Viewport viewport = null!;
 
     public static TextureIndex Textures { get; private set; } = null!;
     public static MaterialIndex Materials { get; private set; } = null!;
@@ -96,6 +98,8 @@ class Game : Application
         //};
 
         //pipeline = device.CreateGraphicsPipeline(pipelineOptions);
+
+        viewport = new();
     }
 
     public void Load()
@@ -151,7 +155,6 @@ class Game : Application
         if (graphics.BeginFrame())
         {
             gameRenderer.Render();
-            gameRenderer.OverlayRenderer.PushBox(new(new(-64, 0, -64), new(64, 64, 64)), 0xFF343434);
             graphics.EndFrame();
         }
 

@@ -132,6 +132,11 @@ internal class BlockMaskManager
         computePass.End();
     }
 
+    public void DrawDebugOverlay()
+    {
+        Game.gameRenderer.OverlayRenderer.PushBox(new(new(-width/2, 0, -depth/2), new(width/2, height, depth/2)), 0xFF343434);
+    }
+
     struct WorldBlockMaskInfo
     {
         public Coordinates position;

@@ -1,5 +1,6 @@
 - entity collision
 - entity raycasting
+	-entity bvh?
 - gui
 - items?
 - infinite worlds
@@ -11,10 +12,10 @@
 	- or just store mask as 64 bit for faster raycasting?
 
 - graphics:
-	- spatial hash LODs
-	- reflective materials
 	- raytracing acceleration (mipmaps or 64 trees)
 	- halton sequences for faster ray convergence
+
+
 
 long term
 - serialization (rip system out of spacegame?)

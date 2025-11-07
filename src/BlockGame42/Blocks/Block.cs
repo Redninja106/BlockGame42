@@ -38,7 +38,7 @@ abstract class Block
         this.Strength = strength;
     }
 
-    public virtual void OnInteract(Player player, BlockState state, ChunkNeighborhood neighborhood, Coordinates localLocation)
+    public virtual void OnInteract(Player player, in BlockReference block)
     {
     }
 
@@ -96,11 +96,10 @@ abstract class Block
 
     protected void TryFall2(World world, in BlockReference block)
     {
-        if (block.Offset(Coordinates.Down).Block == Game.Blocks.Air)
+        if (block.Offset(Coordinates.Down).Prototype == Game.Blocks.Air)
         {
-            block.Block = Game.Blocks.Air;
             world.AddEntity(new BlockEntity(world, this, block.State, block.WorldCoordinates));
-
+            block.Set(Game.Blocks.Air);
             world.UpdateBlock(block.WorldCoordinates + Coordinates.Up);
             return;
         }
@@ -109,11 +108,11 @@ abstract class Block
         for (int i = 0; i < 4; i++)
         {
             var side = block.Offset(offsets[i]);
-            if (side.Block == Game.Blocks.Air)
+            if (side.Prototype == Game.Blocks.Air)
             {
-                if (side.Offset(Coordinates.Down).Block == Game.Blocks.Air)
+                if (side.Offset(Coordinates.Down).Prototype == Game.Blocks.Air)
                 {
-                    block.Block = Game.Blocks.Air;
+                    block.Prototype = Game.Blocks.Air;
                     world.AddEntity(new BlockEntity(world, this, block.State, side.WorldCoordinates));
 
                     world.UpdateBlock(block.WorldCoordinates + Coordinates.Up);
@@ -123,7 +122,7 @@ abstract class Block
         }
     }
 
-    public virtual void OnRandomTick(World world, BlockState state, ChunkNeighborhood neighborhood, Coordinates localLocation)
+    public virtual void OnRandomTick(World world, in BlockReference block)
     {
     }
 }
@@ -323,11 +322,11 @@ class EmptyBlock : Block
     {
     }
 
-    public override void OnInteract(Player player, BlockState state, ChunkNeighborhood neighborhood, Coordinates localLocation)
+    public override void OnInteract(Player player, in BlockReference block)
     {
     }
 
-    public override void OnRandomTick(World world, BlockState state, ChunkNeighborhood neighborhood, Coordinates localLocation)
+    public override void OnRandomTick(World world, in BlockReference block)
     {
     }
 }

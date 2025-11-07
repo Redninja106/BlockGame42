@@ -106,7 +106,7 @@ internal class ChunkRenderer
             MaxLod = 5,
         });
 
-        blockMaskManager = new BlockMaskManager(graphics, 512, 64, 512);
+        blockMaskManager = new BlockMaskManager(graphics, 512, 128, 512);
 
         giPipeline = graphics.shaders.GetComputePipeline("gi");
 
@@ -140,6 +140,8 @@ internal class ChunkRenderer
 
     public void Render(Camera camera, ChunkManager chunks)
     {
+        blockMaskManager.DrawDebugOverlay();
+        
         bool anyStale = false;
         foreach (var (coords, (chunk, mesh)) in chunks.chunkMap)
         {

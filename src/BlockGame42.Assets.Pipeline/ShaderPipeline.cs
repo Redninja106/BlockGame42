@@ -153,7 +153,7 @@ internal class ShaderPipeline : AssetPipeline
 
     private void SlangCompiler(string inputFile, string? target = null, string? profile = null, string? stage = null, string? output = null, string? reflectionJson = null)
     {
-        string SlangCompilerPath = Path.Combine(Path.GetDirectoryName(Process.GetCurrentProcess().MainModule!.FileName)!, "../../../slang-2025.17-windows-x86_64/bin/slangc.exe");
+        string SlangCompilerPath = Path.Combine(Path.GetDirectoryName(Process.GetCurrentProcess().MainModule!.FileName)!, "../../../slang_dxc/bin/slangc.exe");
 
         List<string> args = [inputFile];
         
@@ -194,7 +194,7 @@ internal class ShaderPipeline : AssetPipeline
 
     private void DxCompiler(string inputFile, string? target = null, string? output = null, string? debugInfo = null)
     {
-        string DxCompilerPath = Path.Combine(Path.GetDirectoryName(Process.GetCurrentProcess().MainModule!.FileName)!, "../../../slang-2025.17-windows-x86_64/bin/dxc.exe");
+        string DxCompilerPath = Path.Combine(Path.GetDirectoryName(Process.GetCurrentProcess().MainModule!.FileName)!, "../../../slang_dxc/bin/dxc.exe");
         
         List<string> args = [inputFile];
 

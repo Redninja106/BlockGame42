@@ -6,14 +6,17 @@
 - infinite worlds
 	- worldgen
 		- biomes?
+
 - find texture art
 	- maybe 32x32 actual pictures?
-- 64 trees?
-	- or just store mask as 64 bit for faster raycasting?
 
 - graphics:
-	- raytracing acceleration (mipmaps or 64 trees)
+	- raytracing acceleration (mipmaps)
 	- halton sequences for faster ray convergence
+	- use pointer into blockmesh array for custom block shapes (& maybe improved memory efficency)
+	- 
+- fluids
+	- 
 
 
 

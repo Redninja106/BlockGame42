@@ -29,8 +29,8 @@ internal class TexturePipeline : AssetPipeline
 
     public static byte[] EncodeImage(int width, int height, Span<byte> pixelData)
     {
-        Span<byte> widthBytes = MemoryMarshal.AsBytes<int>(new(ref width));
-        Span<byte> heightBytes = MemoryMarshal.AsBytes<int>(new(ref height));
+        Span<byte> widthBytes = MemoryMarshal.AsBytes<int>(new Span<int>(ref width));
+        Span<byte> heightBytes = MemoryMarshal.AsBytes<int>(new Span<int>(ref height));
 
         return [.. widthBytes, .. heightBytes, ..pixelData];
     }

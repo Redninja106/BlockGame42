@@ -77,7 +77,6 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     //     reflection_color = .25;
     // }
 
-
     float3 totalColor = float3(0);
     for (int i = 0; i < samples; i++)
     {
@@ -91,8 +90,8 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     }
     totalColor *= (1.0 / samples);
     // totalColor = (1 - reflectiveness) * totalColor + reflectiveness * reflection_color;
-    
-    uint idx = find_or_insert(position, normal);
+
+    uint idx = find_or_insert(position, normal, hash_detail(position, uniforms.cameraPosition.xyz));
     InterlockedAdd(tileIrradiances[idx].r, int(255 * totalColor.r));
     InterlockedAdd(tileIrradiances[idx].g, int(255 * totalColor.g));
     InterlockedAdd(tileIrradiances[idx].b, int(255 * totalColor.b));
@@ -119,12 +118,12 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     }
 }
 
-uint find_or_insert(float3 position, float3 normal)
+uint find_or_insert(float3 position, float3 normal, float detail)
 {
     const int max_search = 32;
 
     uint hash, checksum;
-    get_hash_and_checksum(position, normal, hash, checksum);
+    get_hash_and_checksum(position, normal, detail, hash, checksum);
 
     uint searchIndex = hash % uniforms.tileCount;
     for (int i = 0; i < max_search; i++)
@@ -261,7 +260,7 @@ float3 reflection_color(Ray ray)
     ray.inverseDirection = 1 / ray.direction;
     float3 color = ray_color(ray, hitNormal);
 
-    uint new_idx = find_or_insert(hitPos, hitNormal);
+    uint new_idx = find_or_insert(hitPos, hitNormal, 16);
     InterlockedAdd(tileIrradiances[new_idx].r, int(255 * color.r));
     InterlockedAdd(tileIrradiances[new_idx].g, int(255 * color.g));
     InterlockedAdd(tileIrradiances[new_idx].b, int(255 * color.b));
@@ -270,7 +269,7 @@ float3 reflection_color(Ray ray)
     float4 total_irradiance = 0;
     for (int i = 0; i < uniforms.phaseCount; i++)
     {
-        uint idx = find(i, hitPos, hitNormal);
+        uint idx = find(i, hitPos, hitNormal, 16);
 
         if (idx == 0xFFFFFFFF)
         {
@@ -295,10 +294,10 @@ float3 reflection_color(Ray ray)
     return reflection_color * transmission + emission;
 }
 
-uint find(uint phase, float3 position, float3 normal)
+uint find(uint phase, float3 position, float3 normal, float detail)
 {
     uint hash, checksum;
-    get_hash_and_checksum(position, normal, hash, checksum);
+    get_hash_and_checksum(position, normal, detail, hash, checksum);
 
     uint searchIndex = hash % uniforms.tileCount;
     for (int i = 0; i < 32; i++)

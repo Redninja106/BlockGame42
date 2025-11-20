@@ -285,6 +285,7 @@ internal class ChunkRenderer
 
         TileRenderUniforms tileUniforms = new()
         {
+            cameraPosition = uniforms.cameraPosition,
             phaseCount = tileLookupManager.PhaseCount,
             tileCount = tileLookupManager.TilesPerPhase,
             currentPhase = tileLookupManager.CurrentPhase,
@@ -312,6 +313,7 @@ internal class ChunkRenderer
 
     struct TileRenderUniforms
     {
+        public Vector4 cameraPosition;
         public uint phaseCount;
         public uint tileCount;
         public uint currentPhase;

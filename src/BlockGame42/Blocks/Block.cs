@@ -44,10 +44,10 @@ abstract class Block
 
     public virtual void OnUpdate(World world, in BlockReference block)
     {
-        if (block.Support == 0)
-        {
-            TryFall2(world, in block);
-        }
+        // if (block.Support == 0)
+        // {
+        //     TryFall2(world, in block);
+        // }
     }
 
     static Coordinates[] offsets = [Coordinates.East, Coordinates.South, Coordinates.West, Coordinates.North];
@@ -112,8 +112,8 @@ abstract class Block
             {
                 if (side.Offset(Coordinates.Down).Prototype == Game.Blocks.Air)
                 {
-                    block.Prototype = Game.Blocks.Air;
                     world.AddEntity(new BlockEntity(world, this, block.State, side.WorldCoordinates));
+                    block.Set(Game.Blocks.Air);
 
                     world.UpdateBlock(block.WorldCoordinates + Coordinates.Up);
                     return;

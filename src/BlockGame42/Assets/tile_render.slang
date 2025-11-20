@@ -20,6 +20,7 @@ SDL_FS_RESOURCE(6, StructuredBuffer<uint4> tileReflections);
 
 struct Uniforms
 {
+    float4 cameraPosition;
     uint phaseCount;
     uint tilesPerPhase;
     uint currentPhase;
@@ -27,13 +28,12 @@ struct Uniforms
 
 SDL_FS_UNIFORM_BUFFER(0, Uniforms uniforms);
 
-
-uint find(uint phase, float3 position, float3 normal)
+uint find(uint phase, float3 position, float3 normal, float detail)
 {
     uint phaseOffset = phase * uniforms.tilesPerPhase;
 
     uint hash, checksum;
-    get_hash_and_checksum(position, normal, hash, checksum);
+    get_hash_and_checksum(position, normal, detail, hash, checksum);
 
     uint searchIndex = hash % uniforms.tilesPerPhase;
     for (int i = 0; i < 32; i++)
@@ -72,21 +72,20 @@ float4 main(float4 position : SV_Position) : SV_Target
         return float4(.392f, .584f, .929f, 1);
     }
 
+
     // return float4((tileLookup[int(position.y) * 1920 + int(position.x)].accumulatedCount).xxx / 32.0, 1);
     // return float4(sin((idx * 1234.678954) % 15634.51414), sin((idx * 6243.16324) % 7123.72346), sin((idx * 2645.6234) % 6234.172378), 1);
     // return float4((conflicts).xxx / 32.0, 1);
 
     float4 total_reflection = 0;
     float4 total_irradiance = 0;
-    for (int i = 0; i < uniforms.phaseCount; i++) 
+    for (int i = 0; i < uniforms.phaseCount; i++)
     {
-        uint idx = find(i, position, normal);
+        uint idx = find(i, position, normal, hash_detail(position, uniforms.cameraPosition.xyz));
 
         if (idx == 0xFFFFFFFF)
         {
-            // emit green - not found / more than 32 hash conflicts
             continue;
-            return float4(0, 1, 0, 1);
         }
 
         uint4 packed_irradiance = tileIrradiances[idx];
@@ -94,10 +93,10 @@ float4 main(float4 position : SV_Position) : SV_Target
         uint accumulatedCount = packed_irradiance.w;
         if (accumulatedCount == 0)
         {
-            // emit red - no illumination samples
             continue;
-            return float4(1, 0, 0, 1);
         }
+
+        // return float4(sin((idx * 1234.678954) % 15634.51414), sin((idx * 6243.16324) % 7123.72346), sin((idx * 2645.6234) % 6234.172378), 1);
 
         total_irradiance += float4(irradiance, float(accumulatedCount));
 

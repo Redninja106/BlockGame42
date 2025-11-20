@@ -17,7 +17,6 @@ internal class DirectoryAssetSource : IAssetSource
 
     public byte[] Load(string assetName)
     {
-
         return File.ReadAllBytes(Path.Combine(rootDirectory, assetName));
     }
 

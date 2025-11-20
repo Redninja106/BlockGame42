@@ -26,24 +26,24 @@ internal class World
         chunks = new(this, graphics);
         chunks.Initialize();
 
-        foreach (var (chunkCoords, (chunk, mesh)) in chunks.chunkMap)
-        {
-            Timer timer = Timer.Start();
+        //foreach (var (chunkCoords, (chunk, mesh)) in chunks.chunkMap)
+        //{
+        //    Timer timer = Timer.Start();
 
-            for (int y = 0; y < Chunk.Height; y++)
-            {
-                for (int z = 0; z < Chunk.Depth; z++)
-                {
-                    for (int x = 0; x < Chunk.Width; x++)
-                    {
-                        //UpdateSupport(GetBlockReference(chunkCoords * Chunk.Size + new Coordinates(x, y, z)));
-                    }
-                }
-            }
+        //    for (int y = 0; y < Chunk.Height; y++)
+        //    {
+        //        for (int z = 0; z < Chunk.Depth; z++)
+        //        {
+        //            for (int x = 0; x < Chunk.Width; x++)
+        //            {
+        //                UpdateSupport(GetBlockReference(chunkCoords * Chunk.Size + new Coordinates(x, y, z)));
+        //            }
+        //        }
+        //    }
 
-            Console.WriteLine($"support update of chunk {chunkCoords} took {timer.ElapsedMilliseconds()}ms");
+        //    Console.WriteLine($"support update of chunk {chunkCoords} took {timer.ElapsedMilliseconds()}ms");
 
-        }
+        //}
     }
 
     Block nullBlock = Game.Blocks.Unloaded;
@@ -213,7 +213,7 @@ internal class World
             blockRef.Chunk.BlockMasks.Stale = true;
         }
 
-        UpdateSupport(blockRef);
+        // UpdateSupport(blockRef);
         UpdateBlock(blockRef);
 
         for (int i = 0; i < 6; i++)
@@ -292,7 +292,7 @@ internal class World
     public void UpdateBlock(in BlockReference block)
     {
         block.Prototype.OnUpdate(this, in block);
-        UpdateSupport(block);
+        // UpdateSupport(block);
     }
 
     public void UpdateSupport(in BlockReference block, bool weak = false)
@@ -355,7 +355,7 @@ internal class World
                 BlockReference neighbor = block.Offset(ChunkMesh.forwardDirs[i]);
                 if (neighbor.Support < oldSupport)
                 {
-                    UpdateSupport(in neighbor, true);
+                    // UpdateSupport(in neighbor, true);
                 }
             }
         }

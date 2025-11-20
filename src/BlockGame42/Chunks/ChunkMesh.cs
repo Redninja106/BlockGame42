@@ -165,7 +165,7 @@ internal class ChunkMesh
 
     public void Build(Chunk chunk, Coordinates chunkCoordinates)
     {
-        // Timer start = Timer.Start();
+        Timer start = Timer.Start();
         scoped BlockMeshBuilder mesh = new();
 
         for (int y = 0; y < Chunk.Height; y++)
@@ -194,8 +194,7 @@ internal class ChunkMesh
         UploadVertices(CollectionsMarshal.AsSpan(mesh.vertices));
         VertexCount = mesh.vertices.Count;
 
-        //Console.WriteLine($"meshing chunk {chunkCoordinates} took {start.ElapsedMilliseconds()}ms");
-        // return start.ElapsedMilliseconds();
+        Console.WriteLine($"meshing chunk {chunkCoordinates} took {start.ElapsedMilliseconds()}ms");
     }
 
     private int RoundToIncrement(int size)

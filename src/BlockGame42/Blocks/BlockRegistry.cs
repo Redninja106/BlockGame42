@@ -69,6 +69,7 @@ class HalfBlockModel : BlockModel
         {
             return BlockFaceMask.Empty;
         }
+
         return BlockFaceMask.BottomHalf;
     }
 

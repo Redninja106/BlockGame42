@@ -34,7 +34,7 @@ internal class WorldGenerator
         {
             for (int x = 0; x < Chunk.Width; x++)
             {
-                double h = x + z;// 10 + 5 * HeightSample(.01 * (chunkCoordinates.X * Chunk.Width + x), .01 * (chunkCoordinates.Z * Chunk.Depth + z));
+                double h = 10 + 5 * HeightSample(.01 * (chunkCoordinates.X * Chunk.Width + x), .01 * (chunkCoordinates.Z * Chunk.Depth + z));
 
                 for (int y = 0; y < Chunk.Height; y++)
                 {

@@ -60,7 +60,7 @@ readonly ref struct BlockReference
     public void Set(Block block, BlockState state)
     {
         Prototype = block;
-        State = default;
+        State = state;
         Support = block.Strength.Tension;
         Mask = block.Model.GetVolumeMask(State);
     }

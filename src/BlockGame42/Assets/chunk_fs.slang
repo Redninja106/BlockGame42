@@ -319,6 +319,8 @@ FsOut main(VsOut vsout)
     float2 uv = vsout.textureCoordinates;
     uv = floor(uv * res) / res;
     o.id = vsout.baseFaceID + ((int)(uv.y * res * res)) + (int)(uv.x * res);
-    
+
     return o;
 }
+
+

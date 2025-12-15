@@ -14,6 +14,8 @@ readonly ref struct BlockReference
     public readonly ref byte Support;
     public readonly ref ulong Mask;
 
+    public bool IsNull => Chunk == null;
+
     public BlockReference(World world, Chunk? chunk, Coordinates chunkCoordinates, Coordinates worldCoordinates, ref Block block, ref BlockState state, ref byte support, ref ulong mask)
     {
         World = world;
@@ -59,9 +61,12 @@ readonly ref struct BlockReference
 
     public void Set(Block block, BlockState state)
     {
-        Prototype = block;
-        State = state;
-        Support = block.Strength.Tension;
-        Mask = block.Model.GetVolumeMask(State);
+        if (Chunk != null)
+        {
+            Prototype = block;
+            State = state;
+            Support = block.Strength.Tension;
+            Mask = block.Model.GetVolumeMask(State);
+        }
     }
 }

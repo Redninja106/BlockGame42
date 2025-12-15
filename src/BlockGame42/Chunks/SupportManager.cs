@@ -10,14 +10,14 @@ namespace BlockGame42.Chunks;
 
 internal class SupportManager
 {
-    ChunkManager chunks;
+    ClientChunkManager chunks;
     List<Coordinates> chunkLocations;
     int nextUpdate;
 
-    public SupportManager(ChunkManager chunks)
+    public SupportManager(ClientChunkManager chunks)
     {
         this.chunks = chunks;
-        chunkLocations = chunks.chunkMap.Keys.ToList();
+        // chunkLocations = chunks.chunkMap.Keys.ToList();
     }
 
 

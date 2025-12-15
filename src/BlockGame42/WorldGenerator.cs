@@ -11,21 +11,18 @@ namespace BlockGame42;
 internal class WorldGenerator
 {
     List<OpenSimplexNoise> octaves;
-    World world;
 
-    public WorldGenerator(World world)
+    public WorldGenerator()
     {
         octaves = [];
         for (int i = 0; i < 5; i++)
         {
             octaves.Add(new OpenSimplexNoise());
-            Thread.Sleep(1); // so time-based seed is different
+            Thread.Sleep(1); // hack so time-based seed is different
         }
-
-        this.world = world;
     }
 
-    public void GenerateChunk(Coordinates chunkCoordinates, Chunk chunk)
+    public void GenerateChunk(World world, Coordinates chunkCoordinates, Chunk chunk)
     {
         Console.WriteLine("generating chunk " + chunkCoordinates);
 
@@ -42,11 +39,13 @@ internal class WorldGenerator
                     //var block = origin.Offset(new(x, y, z));
                     if (y < h)
                     {
-                        block.Set(Game.Blocks.Stone);
+                        BlockState state = default;
+                        state.DynamicBlock.Mask = 0xFF;
+                        block.Set(BlockRegistry.Stone, state);
                     }
                     else
                     {
-                        block.Set(Game.Blocks.Air);
+                        block.Set(BlockRegistry.Air);
                     }
                 }
             }

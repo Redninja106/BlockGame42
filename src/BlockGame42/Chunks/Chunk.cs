@@ -1,10 +1,14 @@
 ﻿using BlockGame42.Blocks;
+using BlockGame42.Blocks.Models;
 using BlockGame42.Rendering;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -103,10 +107,7 @@ internal class Chunk
 struct BlockState
 {
     [FieldOffset(0)]
-    public byte Raw;
-
-    [FieldOffset(0)]
-    public HalfBlockState HalfBlock;
+    public byte Raw0;
 
     [FieldOffset(0)]
     public DynamicBlockState DynamicBlock;
@@ -195,6 +196,7 @@ struct Coordinates
         this.Z = z;
     }
 
+
     public static Coordinates operator +(Coordinates left, Coordinates right)
     {
         return new(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
@@ -269,5 +271,21 @@ struct Coordinates
     public override bool Equals(object obj)
     {
         return obj is Coordinates coords && coords == this;
+    }
+}
+
+static class CoordinatesExtensions
+{
+    public static Vector128<int> AsVector128Unsafe(this Coordinates coordinates)
+    {
+        Unsafe.SkipInit(out Vector128<int> result);
+        Unsafe.WriteUnaligned(ref Unsafe.As<Vector128<int>, byte>(ref result), coordinates);
+        return result;
+    }
+
+    public static Coordinates AsCoordinates(this Vector128<int> coordinates)
+    {
+        ref byte address = ref Unsafe.As<Vector128<int>, byte>(ref coordinates);
+        return Unsafe.ReadUnaligned<Coordinates>(ref address);
     }
 }

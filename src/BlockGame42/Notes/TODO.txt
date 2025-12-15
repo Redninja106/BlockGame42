@@ -16,7 +16,22 @@
 	- use pointer into blockmesh array for custom block shapes (& maybe improved memory efficency)
 	- 
 - fluids
-	- 
+	- ?
+
+
+- coarse/fine block mask maps
+
+- advanced hits
+
+- ray hit -> block model id
+	- model type:
+		solid
+		dynamic
+
+	entities:
+		- xform
+		- aabb tree
+
 
 
 

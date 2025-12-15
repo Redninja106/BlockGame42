@@ -14,17 +14,26 @@
   <ItemGroup>
     <Content Include="Assets\**\*" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Prototypes\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 	
 	<ItemGroup>
 		<UpToDateCheckInput Include="@(Content);@(None)" />
 	</ItemGroup>
 	
 	<ItemGroup>
+	  <Folder Include="Data\" />
 	  <Folder Include="Notes\" />
 	</ItemGroup>
 	
+	
 	<ItemGroup>
 	  <ProjectReference Include="..\..\..\SDL\src\SDL\SDL.csproj" />
+	  <ProjectReference Include="..\Protor\Protor.csproj" />
 	</ItemGroup>
 	
 	<ItemGroup>

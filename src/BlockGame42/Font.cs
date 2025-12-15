@@ -26,7 +26,7 @@ class Font
 
     private Glyph?[] glyphs;
 
-    public Font(GraphicsManager graphics, IAssetSource assets, string fontName)
+    public Font(GraphicsContext graphics, IAssetSource assets, string fontName)
     {
         this.FontName = fontName;
 

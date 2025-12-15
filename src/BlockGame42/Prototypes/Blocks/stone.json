@@ -1,0 +1,13 @@
+﻿{
+  "Prototype": "DynamicBlock",
+  "Name": "stone",
+  "Model": {
+    "Prototype": "DynamicBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "stone",
+      "Normal": "stone_n",
+      "Specular": "stone_s"
+    }
+  }
+}

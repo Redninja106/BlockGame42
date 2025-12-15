@@ -9,7 +9,7 @@ namespace BlockGame42.Blocks;
 internal abstract class BlockPlacementHandler
 {
     public static readonly BlockPlacementHandler Solid = new SolidBlockPlacementHandler();
-    public static readonly BlockPlacementHandler Half = new HalfBlockPlacementHandler();
+    //public static readonly BlockPlacementHandler Half = new HalfBlockPlacementHandler();
     public static readonly BlockPlacementHandler Dynamic = new DynamicBlockPlacementHandler();
 
     public BlockPlacementHandler()
@@ -31,7 +31,7 @@ class SolidBlockPlacementHandler : BlockPlacementHandler
             // }
             
             Coordinates placeCoords = hitCoords + normal;
-            if (world.GetBlock(placeCoords, out _) == Game.Blocks.Air)
+            if (world.GetBlock(placeCoords, out _) == BlockRegistry.Air)
             {
                 world.SetBlock(placeCoords, block);
             }
@@ -39,51 +39,51 @@ class SolidBlockPlacementHandler : BlockPlacementHandler
     }
 }
 
-class HalfBlockPlacementHandler : BlockPlacementHandler
-{
-    public override void OnPlaceBlock(World world, Camera camera, Block block)
-    {
-        Ray ray = new(camera.transform.Position, camera.transform.Forward, 100);
-        if (world.Raycast(ray, out float t, out Coordinates hitCoords, out Coordinates normal))
-        {
-            if (world.GetBlock(hitCoords, out BlockState state) is HalfBlock hb)
-            {
-                if (block == hb)
-                {
-                    if (!state.HalfBlock.Doubled)
-                    {
-                        if (normal == new Coordinates(0, 1, 0))
-                        {
-                            state.HalfBlock = new(true, state.HalfBlock.Direction);
-                            world.SetBlock(hitCoords, hb, state);
-                            return;
-                        }
-                    }
-                }
-            }
+//class HalfBlockPlacementHandler : BlockPlacementHandler
+//{
+//    public override void OnPlaceBlock(World world, Camera camera, Block block)
+//    {
+//        Ray ray = new(camera.transform.Position, camera.transform.Forward, 100);
+//        if (world.Raycast(ray, out float t, out Coordinates hitCoords, out Coordinates normal))
+//        {
+//            if (world.GetBlock(hitCoords, out BlockState state) is HalfBlock hb)
+//            {
+//                if (block == hb)
+//                {
+//                    if (!state.HalfBlock.Doubled)
+//                    {
+//                        if (normal == new Coordinates(0, 1, 0))
+//                        {
+//                            state.HalfBlock = new(true, state.HalfBlock.Direction);
+//                            world.SetBlock(hitCoords, hb, state);
+//                            return;
+//                        }
+//                    }
+//                }
+//            }
 
-            Coordinates placeCoords = hitCoords + normal;
+//            Coordinates placeCoords = hitCoords + normal;
 
-            switch (world.GetBlock(placeCoords, out state))
-            {
-                case EmptyBlock:
-                    world.SetBlock(placeCoords, block);
-                    break;
+//            switch (world.GetBlock(placeCoords, out state))
+//            {
+//                case EmptyBlock:
+//                    world.SetBlock(placeCoords, block);
+//                    break;
 
-                case HalfBlock h:
-                    BlockState placingState = new()
-                    {
-                        HalfBlock = new(true, state.HalfBlock.Direction),
-                    };
-                    world.SetBlock(placeCoords, h, placingState);
-                    break;
+//                //case HalfBlock h:
+//                //    BlockState placingState = new()
+//                //    {
+//                //        HalfBlock = new(true, state.HalfBlock.Direction),
+//                //    };
+//                //    world.SetBlock(placeCoords, h, placingState);
+//                //    break;
 
-            }
+//            }
             
 
-        }
-    }
-}
+//        }
+//    }
+//}
 
 class DynamicBlockPlacementHandler : BlockPlacementHandler
 {
@@ -93,7 +93,7 @@ class DynamicBlockPlacementHandler : BlockPlacementHandler
         if (world.Raycast(ray, out float t, out Coordinates hitCoords, out Coordinates normal))
         {
             Coordinates placeCoords = hitCoords + normal;
-            if (world.GetBlock(placeCoords, out _) == Game.Blocks.Air)
+            if (world.GetBlock(placeCoords, out _) == BlockRegistry.Air)
             {
                 world.SetBlock(placeCoords, block, new() { DynamicBlock = new(0xFF) });
             }

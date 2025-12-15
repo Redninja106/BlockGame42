@@ -1,0 +1,13 @@
+{
+  "Prototype": "DynamicBlock",
+  "Name": "dirt",
+  "Model": {
+    "Prototype": "DynamicBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "dirt",
+      "Normal": "dirt_n",
+      "Specular": "dirt_s"
+    }
+  }
+}

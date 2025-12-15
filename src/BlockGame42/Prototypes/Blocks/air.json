@@ -1,0 +1,10 @@
+{
+  "Prototype": "EmptyBlock",
+  "Name": "air",
+  "Model": {
+    "Prototype": "EmptyBlockModel",
+    "Material": {
+      "Prototype": "EmptyBlockMaterial"
+    }
+  }
+}

@@ -13,7 +13,7 @@ internal class GUIRenderer
 {
     const int MaxVertices = 64 * 1024;
 
-    private readonly GraphicsManager graphics;
+    private readonly GraphicsContext graphics;
 
     GraphicsPipeline pipeline;
     DataBuffer vertexBuffer;
@@ -30,7 +30,7 @@ internal class GUIRenderer
 
     private DrawCommand activeCommand;
 
-    public GUIRenderer(GraphicsManager graphics)
+    public GUIRenderer(GraphicsContext graphics)
     {
         this.graphics = graphics;
 

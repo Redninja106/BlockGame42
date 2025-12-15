@@ -12,7 +12,7 @@ internal class OverlayRenderer
 {
     const int MaxVertices = 64 * 1024;
 
-    private readonly GraphicsManager graphics;
+    private readonly GraphicsContext graphics;
 
     GraphicsPipeline pipeline;
     DataBuffer vertexBuffer;
@@ -21,7 +21,7 @@ internal class OverlayRenderer
     int vertexCount;
     Matrix4x4 viewProjMatrix;
 
-    public OverlayRenderer(GraphicsManager graphics)
+    public OverlayRenderer(GraphicsContext graphics)
     {
         this.graphics = graphics;
 

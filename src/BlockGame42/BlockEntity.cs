@@ -1,4 +1,5 @@
 ﻿using BlockGame42.Blocks;
+using BlockGame42.Blocks.Models;
 using BlockGame42.Chunks;
 using BlockGame42.Rendering;
 using SDL.GPU;
@@ -14,7 +15,7 @@ internal class BlockEntity : Entity
     private Block block;
     private BlockState state;
 
-    private BlockMesh mesh;
+    // private BlockMesh mesh;
     private Matrix4x4 meshTransform;
 
     private Vector3 velocity;
@@ -24,7 +25,7 @@ internal class BlockEntity : Entity
         this.block = block;
         this.state = state;
 
-        mesh = block.Model.GetMesh(state, out meshTransform);
+        // mesh = block.Model.CreateMesh( state, out meshTransform);
 
         Teleport(new Transform() { Position = location.ToVector() });
     }
@@ -33,28 +34,28 @@ internal class BlockEntity : Entity
     {
         Matrix4x4 transform = this.meshTransform * this.InterpolatedTransform.Matrix();
         commandBuffer.PushVertexUniformData(0, ref transform);
-        mesh.Draw(commandBuffer, pass);
+        // mesh.Draw(commandBuffer, pass);
 
         base.Draw(commandBuffer, pass);
     }
 
     public override void Tick()
     {
-        this.velocity += new Vector3(0, -1, 0) * Game.TimeStep;
+        this.velocity += new Vector3(0, -1, 0) * GameClient.TimeStep;
         Transform newTransform = Transform.Translated(velocity);
 
         Coordinates posBelow = Coordinates.Floor(newTransform.Position);
         Block? below = World.GetBlock(posBelow, out var belowState);
         if (below is not EmptyBlock)
         {
-            if (below is HalfBlock half && !state.HalfBlock.Doubled && !belowState.HalfBlock.Doubled)
-            {
-                World.SetBlock(posBelow, half, new BlockState() { HalfBlock = new(true, belowState.HalfBlock.Direction) });
-            }
-            else
-            {
+            //if (below is HalfBlock half && !state.HalfBlock.Doubled && !belowState.HalfBlock.Doubled)
+            //{
+            //    World.SetBlock(posBelow, half, new BlockState() { HalfBlock = new(true, belowState.HalfBlock.Direction) });
+            //}
+            //else
+            //{
                 World.SetBlock(Coordinates.Floor(this.Transform.Position), this.block, this.state);
-            }
+            //}
 
             World.RemoveEntity(this);
         }
@@ -71,7 +72,7 @@ class BlockMeshRenderer
 {
     GraphicsPipeline pipeline;
 
-    public BlockMeshRenderer(GraphicsManager graphics)
+    public BlockMeshRenderer(GraphicsContext graphics)
     {
         pipeline = graphics.device.CreateGraphicsPipeline(new()
         {
@@ -100,11 +101,11 @@ class BlockMeshRenderer
 
 class BlockMesh
 {
-    private GraphicsManager graphics;
+    private GraphicsContext graphics;
     private DataBuffer vertexBuffer;
     private int vertexCount;
 
-    public BlockMesh(GraphicsManager graphics, MinimizedChunkVertex[] vertices)
+    public BlockMesh(GraphicsContext graphics, MinimizedChunkVertex[] vertices)
     {
         this.graphics = graphics;
 
@@ -124,11 +125,10 @@ class BlockMesh
         vertexCount = vertices.Length;
     }
 
-    public static BlockMesh CreateFromModel(GraphicsManager graphics, BlockModel model, BlockState blockState)
+    public static BlockMesh CreateFromModel(GraphicsContext graphics, BlockModel model, BlockState blockState)
     {
         BlockMeshBuilder meshBuilder = new();
 
-        Material material = model.GetMaterial(blockState);
         for (int i = 0; i < 6; i++)
         {
             meshBuilder.AppendPartialBlockFace(
@@ -137,8 +137,7 @@ class BlockMesh
                 ChunkMesh.rightDirs[i].ToVector(),
                 ChunkMesh.upDirs[i].ToVector(),
                 ChunkMesh.forwardDirs[i].ToVector(),
-                material.Data.Transmission[(Direction)i],
-                material.Data.Emission[(Direction)i]
+                model.Material.TexID
                 );
         }
 
@@ -147,7 +146,7 @@ class BlockMesh
         return new BlockMesh(graphics, meshBuilder.vertices.ToArray());
     }
 
-    public static BlockMesh CreateFromItemTextureData(GraphicsManager graphics, TextureData itemTexture)
+    public static BlockMesh CreateFromItemTextureData(GraphicsContext graphics, TextureData itemTexture)
     {
         throw new NotImplementedException();
     }

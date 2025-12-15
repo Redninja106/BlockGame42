@@ -7,16 +7,21 @@ struct TileRecord
     uint4 accumulatedColor;
 };
 
-SDL_FS_RESOURCE(0, Texture2DArray<float4> blockTextures);
 SDL_FS_SAMPLER(0, SamplerState sampler);
+SDL_FS_SAMPLER(1, SamplerState sampler1);
+SDL_FS_SAMPLER(2, SamplerState sampler2);
 
-SDL_FS_RESOURCE(1, Texture2D<float4> positionTarget);
-SDL_FS_RESOURCE(2, Texture2D<float4> normalTarget);
-SDL_FS_RESOURCE(3, Texture2D<float4> texCoordTarget);
+SDL_FS_RESOURCE(0, Texture2DArray<float4> albedoTextureArray);
+SDL_FS_RESOURCE(1, Texture2DArray<float4> normalTextureArray);
+SDL_FS_RESOURCE(2, Texture2DArray<float4> specularTextureArray);
 
-SDL_FS_RESOURCE(4, StructuredBuffer<uint> tileChecksums);
-SDL_FS_RESOURCE(5, StructuredBuffer<uint4> tileIrradiances);
-SDL_FS_RESOURCE(6, StructuredBuffer<uint4> tileReflections);
+SDL_FS_RESOURCE(3, Texture2D<float4> positionTarget);
+SDL_FS_RESOURCE(4, Texture2D<float4> normalTarget);
+SDL_FS_RESOURCE(5, Texture2D<float4> texCoordTarget);
+
+SDL_FS_RESOURCE(6, StructuredBuffer<uint> tileChecksums);
+SDL_FS_RESOURCE(7, StructuredBuffer<uint4> tileIrradiances);
+SDL_FS_RESOURCE(8, StructuredBuffer<uint4> tileReflections);
 
 struct Uniforms
 {
@@ -64,9 +69,18 @@ float4 main(float4 position : SV_Position) : SV_Target
     float3 normal = normalTarget[location].xyz;
     float4 texCoords = texCoordTarget[location];
 
-    float4 texColor = blockTextures.Sample(sampler, texCoords.xyz);
-    float4 texEmmission = blockTextures.Sample(sampler, texCoords.xyw);
-    
+    float4 albedo = albedoTextureArray.Sample(sampler, texCoords.xyz);
+    float4 sampledNormal = normalTextureArray.Sample(sampler, texCoords.xyz);
+    float4 specular = specularTextureArray.Sample(sampler, texCoords.xyz);
+
+    float emission = specular.a;
+    if (emission == 1)
+    {
+        emission = 0;
+    }
+
+    float reflectance = specular.g <= 229 ? specular.g : 0;
+
     if (all(normal == 0))
     {
         return float4(.392f, .584f, .929f, 1);
@@ -100,7 +114,7 @@ float4 main(float4 position : SV_Position) : SV_Target
 
         total_irradiance += float4(irradiance, float(accumulatedCount));
 
-        if (texEmmission.w > 0 && i == uniforms.currentPhase)
+        if (specular.w > 0 && i == uniforms.currentPhase)
         {
             uint4 packed_reflection = tileReflections[idx - i * uniforms.tilesPerPhase];
             total_reflection.xyz = float3(packed_reflection.xyz) / 255.0;
@@ -110,18 +124,18 @@ float4 main(float4 position : SV_Position) : SV_Target
 
     total_irradiance.xyz /= total_irradiance.w;
 
-    // base color is texture + irradiance
-    float3 color = texColor.xyz * total_irradiance.xyz;
+    // base color is texture * irradiance * ao
+    float3 color = albedo.xyz * total_irradiance.xyz * sampledNormal.z * texCoords.w; // texCoord.w is parallax AO
 
     // mix in reflection
     if (total_reflection.w > 0)
     {
         total_reflection.xyz /= total_reflection.w;
-        color = lerp(color, total_reflection.xyz, texEmmission.w);
+        color = lerp(color, total_reflection.xyz, reflectance);
     }
 
     // add emmission
-    color += texEmmission.xyz;
+    color += emission * albedo.xyz;
 
-    return float4(color, 1);
+    return float4(color.xyz, 1);
 }

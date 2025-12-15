@@ -2,18 +2,21 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using BlockGame42.Blocks;
+using BlockGame42.Chunks;
 using BlockGame42.GUI;
 using BlockGame42.Rendering;
+using Protor;
 using SDL;
 using SDL.GPU;
 
 namespace BlockGame42;
 
-class Game : Application
+class GameClient : Application
 {
     private Window window = null!;
     // private Device device = null!;
@@ -22,31 +25,42 @@ class Game : Application
     // private TransferBuffer transferBuffer = null!;
 
 
-    IAssetSource assets = null!;
-    public static GraphicsManager graphics = null!;
-    private World world;
-    public static Player player = null!;
-    public static GameRenderer gameRenderer = null!;
+    // IAssetSource assets = null!;
+    // public static GraphicsManager graphics = null!;
+    // private World world;
+    // public static Player player = null!;
+    // public static GameRenderer gameRenderer = null!;
 
     public static float TimeStep = 1 / 20f;
 
-    public static Viewport viewport = null!;
+    // public static Viewport viewport = null!;
 
-    public static TextureIndex Textures { get; private set; } = null!;
-    public static MaterialIndex Materials { get; private set; } = null!;
+    // public static TextureIndex Textures { get; private set; } = null!;
+    // public static MaterialIndex Materials { get; private set; } = null!;
 
-    public static BlockRegistry Blocks { get; private set; } = null!;
+    // public static BlockRegistry Blocks { get; private set; } = null!;
 
-    private ServiceProvider serviceProvider = new();
+    public GraphicsContext Graphics { get; private set; }
+    public InteractionContext Interaction { get; private set; }
+    public GUIViewport Viewport { get; private set; }
+    public GameRenderer Renderer { get; private set; }
+    public World World { get; private set; }
+    public ClientChunkManager ChunkManager { get; private set; }
 
     protected override void OnInit()
     {
         window = new Window("Block Game", 1920, 1080, WindowFlags.Resizable);
 
-        assets = new DirectoryAssetSource("Assets");
-        graphics = new GraphicsManager(window, assets);
-        
-        Load();
+        var assets = new DirectoryAssetSource("Assets");
+        Graphics = new GraphicsContext(window, assets);
+
+        Renderer = new(Graphics);
+
+        Interaction = new();
+
+        ChunkManager = new(this);
+
+        Load(assets);
 
         //  Textures = new(graphics);
 
@@ -100,29 +114,33 @@ class Game : Application
 
         //pipeline = device.CreateGraphicsPipeline(pipelineOptions);
 
-        viewport = new();
+        // viewport = new();
     }
 
-    public void Load()
+    public void Load(IAssetSource assets)
     {
-        graphics.AcquireCommandBuffer();
         //graphics.transferBatcher.BeginBatch(graphics.CommandBuffer);
 
-        Textures = new(graphics);
-        Materials = new(graphics);
+        Registry.AddAssembly(Assembly.GetExecutingAssembly());
+        Registry.Load();
 
-        Blocks = new();
-        world = new(graphics);
-        player = new(world);
-        player.Transform.Position = new Vector3(0, 50, 0);
+        Renderer.Load(assets);
+
+        // blocks = new(context);
+        World = new World();
+        var player = new PlayerEntity(World);
+        player.Transform.Position = new Vector3(0, 30, 0);
         player.Transform.Rotation = Quaternion.Identity;
-        gameRenderer = new(graphics, assets, world, player);
+        
+        World.AddEntity(player);
+        Interaction.Player = player;
+
+        ChunkManager.Initialize();
+
+        // Interaction.Player = new(World);
 
         //graphics.transferBatcher.EndBatch();
 
-        Textures.GenerateMipmaps(graphics.CommandBuffer);
-
-        graphics.CommandBuffer.Submit();
 
     }
 
@@ -133,32 +151,34 @@ class Game : Application
     {
         window.SetRelativeMouseMode(window.HasKeyboardFocus());
 
-        graphics.AcquireCommandBuffer();
+        Graphics.AcquireCommandBuffer();
 
         float framerate = 1f / deltaTime;
         deltaTime = float.Min(deltaTime, 1 / 30f);
 
         accumulatedTickTime += deltaTime;
 
-        player.Update(deltaTime);
-        player.Camera.Update(window.Width, window.Height);
+        Interaction.Player.Update(deltaTime);
+        Interaction.Player.Camera.Update(window.Width, window.Height);
+
+        ChunkManager.Update(Interaction.Player);
 
         TickProgress = accumulatedTickTime / TimeStep;
-        world.Update();
+        World.Update();
 
         while (accumulatedTickTime > 1 / 20f)
         {
             window.SetTitle($"Block Game - {framerate:N}FPS");
             accumulatedTickTime -= 1 / 20f;
-            world.Tick();
+            World.Tick();
         }
 
-        world.Chunks.BuildStaleChunks();
+        // World.Chunks.BuildStaleChunks();
 
-        if (graphics.BeginFrame())
+        if (Graphics.BeginFrame())
         {
-            gameRenderer.Render();
-            graphics.EndFrame();
+            Renderer.Render(Interaction.Player.Camera, World);
+            Graphics.EndFrame();
         }
 
         //float t = GetTicks() / 1000f;
@@ -182,11 +202,8 @@ class Game : Application
     }
 }
 
-class ServiceProvider
+
+class InteractionContext
 {
-    public World World { get; }
-    public GraphicsManager Graphics { get; }
-    public InteractionManager Interactions { get;}
-
-
+    public PlayerEntity Player { get; set; }
 }

@@ -39,12 +39,11 @@ VsOut main(uint2 vertex : TEXCOORD0, uint primitiveID : SV_VertexID)
     uint n_x   = (vertex.y & 0b00000000000000011000000000000000) >> 15;
     uint n_y   = (vertex.y & 0b00000000000000000110000000000000) >> 13;
     uint n_z   = (vertex.y & 0b00000000000000000001100000000000) >> 11;
-    uint emmid = (vertex.y & 0b00000000000000000000011111111111) >> 0;
 
     VsOut o;
     o.normal = float3(n_x, n_y, n_z) - float3(1);
     float4 pos = float4(x * .25f, y * .25f, z * .25f, 1);
-    o.textureCoordinates = float4(u * .25f, v * .25f, float(texid), float(emmid));
+    o.textureCoordinates = float4(u * .25f, v * .25f, float(texid), 0);
 
     // pos = mul(transform, pos);
     pos = mul(chunkData.transform, pos);

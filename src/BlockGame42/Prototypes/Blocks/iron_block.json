@@ -1,0 +1,13 @@
+{
+  "Prototype": "SolidBlock",
+  "Name": "iron_block",
+  "Model": {
+    "Prototype": "SolidBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "iron_block",
+      "Normal": "iron_block_n",
+      "Specular": "iron_block_s"
+    }
+  }
+}

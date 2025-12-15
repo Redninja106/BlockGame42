@@ -1,12 +1,12 @@
 ﻿namespace BlockGame42.GUI;
 
-class Viewport
+class GUIViewport
 {
     private readonly List<Panel> panels = [];
 
     public float Scale { get; set; }
 
-    public Viewport()
+    public GUIViewport()
     {
     }
 }

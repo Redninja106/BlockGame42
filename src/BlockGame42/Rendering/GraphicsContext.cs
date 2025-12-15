@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace BlockGame42.Rendering;
 
-internal class GraphicsManager
+internal class GraphicsContext
 {
     private readonly IAssetSource assets;
 
@@ -38,7 +38,8 @@ internal class GraphicsManager
 
     public RenderTargetManager RenderTargets { get; }
 
-    public GraphicsManager(Window window, IAssetSource assets)
+
+    public GraphicsContext(Window window, IAssetSource assets)
     {
         this.Window = window;
         this.assets = assets;
@@ -54,8 +55,8 @@ internal class GraphicsManager
         // var deviceProperties = this.device.GetProperties();
         // Console.WriteLine("device: " + deviceProperties.GetString(SDL.Native.Functions.SDL_PROP_GPU_DEVICE_NAME_STRING, default));
 
-        device.ClaimWindow(window);
-        device.SetSwapchainParameters(window, SwapchainComposition.SDRLinear, PresentMode.Immediate);
+        device.ClaimWindow(Window);
+        device.SetSwapchainParameters(Window, SwapchainComposition.SDRLinear, PresentMode.Immediate);
 
         shaders = new(device, assets);
 
@@ -99,7 +100,6 @@ internal class GraphicsManager
         result.Data = data[8..];
         return result;
     }
-
 
     public Texture LoadTexture(string assetName)
     {

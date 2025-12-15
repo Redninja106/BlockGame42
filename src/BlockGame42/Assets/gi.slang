@@ -15,17 +15,20 @@ SDL_CS_RW_RESOURCE(2, RWStructuredBuffer<uint4> tileReflections);
 
 // Samplers/Sampled Textures
 SDL_CS_SAMPLER(0, SamplerState sampler);
-SDL_CS_RESOURCE(0, Texture2DArray<float4> materialTextures);
+SDL_CS_SAMPLER(1, SamplerState sampler1);
+SDL_CS_SAMPLER(2, SamplerState sampler2);
+SDL_CS_RESOURCE(0, Texture2DArray<float4> albedoTextureArray);
+SDL_CS_RESOURCE(1, Texture2DArray<float4> normalTextureArray);
+SDL_CS_RESOURCE(2, Texture2DArray<float4> specularTextureArray);
 
-SDL_CS_RESOURCE(1, Texture2D<float4> positionTarget);
-SDL_CS_RESOURCE(2, Texture2D<float4> normalTarget);
-SDL_CS_RESOURCE(3, Texture2D<float4> texCoordTarget);
+SDL_CS_RESOURCE(3, Texture2D<float4> positionTarget);
+SDL_CS_RESOURCE(4, Texture2D<float4> normalTarget);
+SDL_CS_RESOURCE(5, Texture2D<float4> texCoordTarget);
 
-SDL_CS_RESOURCE(4, Texture3D<uint2> blockMasks);
-SDL_CS_RESOURCE(5, Texture3D<uint> materialIds);
+SDL_CS_RESOURCE(6, Texture3D<uint2> blockMasks);
+SDL_CS_RESOURCE(7, Texture3D<uint> materialIds);
 
-
-SDL_CS_RESOURCE(6, StructuredBuffer<MaterialData> materials)
+// SDL_CS_RESOURCE(8, StructuredBuffer<MaterialData> materials)
 
 struct Uniforms
 {
@@ -56,7 +59,7 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
                   (dispatchThreadID.y + 0x7423) * 0x3f05aa5f;
     random.Next();
 
-    const int samples = 2;
+    const int samples = 4;
 
     // const float3 reflectiveness = 1;
     // float3 reflection_color = 0;
@@ -91,6 +94,15 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     totalColor *= (1.0 / samples);
     // totalColor = (1 - reflectiveness) * totalColor + reflectiveness * reflection_color;
 
+    float3x3 tbn = calc_face_tbn_matrix(normal);
+
+    // float4 sampledNormal = normalTextureArray.SampleLevel(sampler, texCoord.xyz, 0);
+    // float3 n;
+    // n.xy = sampledNormal.xy * 2 - 1;
+    // n.z = sqrt(1.0 - dot(n.xy, n.xy));
+    // float3 worldNormal = normalize(mul(tbn, n));
+    // totalColor = worldNormal * .5 + .5;
+
     uint idx = find_or_insert(position, normal, hash_detail(position, uniforms.cameraPosition.xyz));
     InterlockedAdd(tileIrradiances[idx].r, int(255 * totalColor.r));
     InterlockedAdd(tileIrradiances[idx].g, int(255 * totalColor.g));
@@ -99,22 +111,35 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
 
     // MaterialData material = materials[materialIds[(int3)floor(position) + uniforms.blockMasksOffset]];
     // float2 uv = calc_face_uv(frac(position), normal);
-    float reflection = materialTextures.SampleLevel(sampler, texCoord.xyw, 0).w;
 
-    if (reflection > 0) 
+    // float4 sampledNormal = normalTextureArray.SampleLevel(sampler, texCoord.xyz, 0);
+    float4 specular = specularTextureArray.SampleLevel(sampler, texCoord.xyz, 0);
+
+    float reflection = specular.g <= 229 ? specular.g : 0;
+
+    // float reflection = albedoTextureArray.SampleLevel(sampler, texCoord.xyw, 0).w;
+
+    if (reflection > 0)
     {
-        Ray reflection_ray;
-        reflection_ray.origin = position + normal * .0001;
-        reflection_ray.direction = reflect(normalize(position - uniforms.cameraPosition.xyz), normal);
-        reflection_ray.inverseDirection = 1 / reflection_ray.direction;
-        reflection_ray.length = 64;
+        const int reflect_ray_count = 1;
 
-        float3 reflect_color = reflection_color(reflection_ray);
+        float3 reflect_color = 0;
+        for (int i = 0; i < reflect_ray_count; i++) 
+        {
+            Ray reflection_ray;
+            reflection_ray.origin = position + normal * .0001;
+            float roughness = pow(1.0 - specular.r, 2.0);
+            float3 viewDir = normalize(position - uniforms.cameraPosition.xyz);
+            reflection_ray.direction = reflect(viewDir, normal) + random.NextUnitVector() * roughness;
+            reflection_ray.inverseDirection = 1 / reflection_ray.direction;
+            reflection_ray.length = 64;
 
+            reflect_color = reflection_color(reflection_ray);
+        }
         InterlockedAdd(tileReflections[idx - uniforms.tileOffset].r, int(255 * reflect_color.r));
         InterlockedAdd(tileReflections[idx - uniforms.tileOffset].g, int(255 * reflect_color.g));
         InterlockedAdd(tileReflections[idx - uniforms.tileOffset].b, int(255 * reflect_color.b));
-        InterlockedAdd(tileReflections[idx - uniforms.tileOffset].a, 1);
+        InterlockedAdd(tileReflections[idx - uniforms.tileOffset].a, reflect_ray_count);
     }
 }
 
@@ -149,27 +174,39 @@ float3 ray_color(Ray ray, float3 normal)
     float3 hitNormal;
     int3 hitVoxel;
 
-    float3 transmission[MaxBounces];
-    float3 emission[MaxBounces];
+    float3 albedo[MaxBounces];
+    float4 specular[MaxBounces];
+    for (int i = 0; i < MaxBounces; i++)
+    {
+        albedo[i] = 0;
+        specular[i] = 0;
+    }
 
     for (int i = 0; i < MaxBounces; i++)
     {
-        transmission[i] = 0;
-        emission[i] = 0;
-
         if (dda(ray, hitT, hitNormal, hitVoxel))
         {
-            MaterialData material = materials[materialIds[hitVoxel + uniforms.blockMasksOffset]];
+            uint texId = materialIds[hitVoxel + uniforms.blockMasksOffset];
+            // MaterialData material = materials[materialIds[hitVoxel + uniforms.blockMasksOffset]];
             // return hitNormal * .5 + .5;
             float3 hitPos = ray.origin + ray.direction * hitT;
 
             float2 uv = calc_face_uv(frac(hitPos), hitNormal);
+            float3 uvw = float3(uv, texId);
 
-            emission[i] = materialTextures.SampleLevel(sampler, float3(uv, material.emissions[0]), 0).xyz;
-            transmission[i] = materialTextures.SampleLevel(sampler, float3(uv, material.transmissions[0]), 0).xyz;
+            albedo[i] = albedoTextureArray.SampleLevel(sampler, uvw, 0).xyz;
+            specular[i] = specularTextureArray.SampleLevel(sampler, uvw, 0);
+            
+            float3x3 tbn = calc_face_tbn_matrix(hitNormal);
+            float4 sampledNormal = normalTextureArray.SampleLevel(sampler, uvw, 0);
+            float3 n;
+            n.xy = sampledNormal.xy * 2 - 1;
+            n.z = sqrt(1.0 - dot(n.xy, n.xy));
+            float3 worldNormal = normalize(mul(tbn, n));
+            // transmission[i] = materialTextures.SampleLevel(sampler, float3(uv, material.transmissions[0]), 0).xyz;
 
             ray.origin = hitPos + hitNormal * 0.001;
-            ray.direction = normalize(hitNormal + random.NextUnitVector());
+            ray.direction = normalize(worldNormal + random.NextUnitVector());
             ray.inverseDirection = 1 / ray.direction;
         }
         else
@@ -177,7 +214,8 @@ float3 ray_color(Ray ray, float3 normal)
             const float skystrength = .1;
 
             // sky emission
-            emission[i] += float3(skystrength); // + 0.5 * float3(.392f, .584f, .929f);
+            specular[i].w += skystrength; // + 0.5 * float3(.392f, .584f, .929f);
+            albedo[i] = float3(1);
             break;
         }
     }
@@ -195,13 +233,19 @@ float3 ray_color(Ray ray, float3 normal)
     if (!dda(sunRay, hitT, hitNormal, hitVoxel))
     {
         float sunbrightness = dot(sunRay.direction, normal) * dot(sunRay.direction, normalize(uniforms.sundir.xyz));
-        emission[0] += float3(sunstrength * max(0, sunbrightness));
+        //specular[0].w += sunstrength * max(0, sunbrightness);
     }
 
     float3 color = float3(0, 0, 0);
     for (int j = MaxBounces - 1; j >= 0; j--)
     {
-        color = color * transmission[j] + emission[j];
+        float emission = specular[j].w;
+        if (emission == 1) 
+        {
+            emission = 0;
+        }
+
+        color = albedo[j] * (color + emission);
     }
     return color;
 }
@@ -232,12 +276,19 @@ float3 reflection_color(Ray ray)
         // }
 
     // load material data at hit position
-    MaterialData material = materials[materialIds[hitVoxel + uniforms.blockMasksOffset]];
+    uint material = materialIds[hitVoxel + uniforms.blockMasksOffset];
     float2 uv = calc_face_uv(frac(hitPos), hitNormal);
-    float3 transmission = materialTextures.SampleLevel(sampler, float3(uv, material.transmissions[0]), 0).xyz;
-    float4 emission_and_reflectiveness = materialTextures.SampleLevel(sampler, float3(uv, material.emissions[0]), 0);
-    float3 emission = emission_and_reflectiveness.xyz;
-    float reflectiveness = emission_and_reflectiveness.w;
+    float4 albedo = albedoTextureArray.SampleLevel(sampler, float3(uv, material), 0);
+    float4 normal = normalTextureArray.SampleLevel(sampler, float3(uv, material), 0);
+    float4 specular = specularTextureArray.SampleLevel(sampler, float3(uv, material), 0);
+
+    float emission = specular.a;
+    if (emission == 1) emission = 0;
+
+    // float3 transmission = materialTextures.SampleLevel(sampler, float3(uv, material.transmissions[0]), 0).xyz;
+    // float4 emission_and_reflectiveness = materialTextures.SampleLevel(sampler, float3(uv, material.emissions[0]), 0);
+    // float3 emission = emission_and_reflectiveness.xyz;
+    // float reflectiveness = emission_and_reflectiveness.w;
 
     // emissions[order] = emission;
     // transmissions[order] = transmission;
@@ -291,7 +342,7 @@ float3 reflection_color(Ray ray)
 
     float3 reflection_color = (total_irradiance.xyz / total_irradiance.w);
 
-    return reflection_color * transmission + emission;
+    return (reflection_color + emission) * albedo.xyz;
 }
 
 uint find(uint phase, float3 position, float3 normal, float detail)
@@ -330,6 +381,15 @@ float2 calc_face_uv(float3 hitPos, float3 hitNormal)
     float u = select(n.x != 0, -hitPos.z * n.x, hitPos.x * select(n.y != 0, n.y, n.z));
     float v = select(n.y != 0, hitPos.z * n.y, -hitPos.y);
     return frac(float2(u, v));
+}
+
+float3x3 calc_face_tbn_matrix(float3 hitNormal)
+{
+    int3 n = sign(hitNormal);
+    float3 tangent = select(n.x != 0, n.x * float3(0, 0, 1), float3(1, 0, 0) * select(n.y != 0, n.y, -n.z));
+    float3 bitangent = select(n.y != 0, n.y * float3(0, 0, 1), float3(0, 1, 0));
+
+    return float3x3(tangent, bitangent, hitNormal);
 }
 
 struct Box

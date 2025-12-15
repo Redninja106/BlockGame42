@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 namespace BlockGame42.Rendering;
 internal class ChunkRenderer
 {
-    private readonly GraphicsManager graphics;
+    private readonly GraphicsContext graphics;
     private readonly GraphicsPipeline chunkPipeline;
     private readonly Sampler sampler;
     private readonly TransferBuffer blockMaskVolumeTransferBuffer;
@@ -26,6 +26,8 @@ internal class ChunkRenderer
     public Vector4 sundir = new Vector4(MathF.Cos(60 / 180f * MathF.PI), MathF.Sin(60 / 180f * MathF.PI), 0, 1);
     public bool animateSun = true;
 
+    private Dictionary<Chunk, ChunkMesh> chunkMeshes = [];
+
     struct TileRecord
     {
         public uint id;
@@ -34,8 +36,8 @@ internal class ChunkRenderer
         public uint accumulatedB;
         public uint accumulatedCount;
     }
-
-    public ChunkRenderer(GraphicsManager graphics)
+    
+    public ChunkRenderer(GraphicsContext graphics)
     {
         this.graphics = graphics;
 
@@ -106,7 +108,7 @@ internal class ChunkRenderer
             MaxLod = 5,
         });
 
-        blockMaskManager = new BlockMaskManager(graphics, 512, 128, 512);
+        blockMaskManager = new BlockMaskManager(graphics, 1024, 128, 1024);
 
         giPipeline = graphics.shaders.GetComputePipeline("gi");
 
@@ -138,18 +140,27 @@ internal class ChunkRenderer
         public uint ticks;
     }
 
-    public void Render(Camera camera, ChunkManager chunks)
+    public void Render(GameRenderer renderer, Camera camera, World world)
     {
-        blockMaskManager.DrawDebugOverlay();
+        blockMaskManager.DrawDebugOverlay(renderer);
         
-        bool anyStale = false;
-        foreach (var (coords, (chunk, mesh)) in chunks.chunkMap)
+        foreach (var (coords, chunk) in world.Chunks)
         {
             if (chunk.BlockMasks.Stale)
             {
-                blockMaskManager.UpdateChunk(graphics.CommandBuffer, coords, chunk, mesh);
+                blockMaskManager.UpdateChunk(graphics.CommandBuffer, coords, chunk);
                 chunk.BlockMasks.Stale = false;
-                anyStale = true;
+            }
+
+            if (chunk.Blocks.Stale)
+            {
+                ChunkMesh? mesh = chunkMeshes.GetValueOrDefault(chunk);
+                mesh ??= new ChunkMesh(graphics);
+
+                mesh.Build(world, chunk, coords);
+                chunkMeshes[chunk] = mesh;
+
+                chunk.Blocks.Stale = false;
             }
         }
 
@@ -198,12 +209,23 @@ internal class ChunkRenderer
 
         renderPass.BindPipeline(chunkPipeline);
 
+        renderPass.BindFragmentSamplers(0, [
+            new(renderer.Textures.AlbedoTextureArray, sampler),
+            new(renderer.Textures.NormalTextureArray, sampler),
+            new(renderer.Textures.SpecularTextureArray, sampler),
+            ]);
+
+        Vector3 camPos = camera.transform.Position;
+        graphics.CommandBuffer.PushFragmentUniformData(0, ref camPos);
+
         Matrix4x4 viewProj = camera.ViewMatrix() * camera.ProjectionMatrix();
         graphics.CommandBuffer.PushVertexUniformData(1, ref viewProj);
 
         ChunkData data = default;
-        foreach (var (coordinates, (chunk, mesh)) in chunks.chunkMap)
+        foreach (var (coordinates, chunk) in world.Chunks)
         {
+            ChunkMesh mesh = chunkMeshes[chunk];
+
             data.transform = Matrix4x4.CreateTranslation(coordinates.ToVector() * Chunk.SizeVector);
             data.id += (uint)(mesh.VertexCount / 6);
             graphics.CommandBuffer.PushVertexUniformData(0, ref data);
@@ -226,7 +248,9 @@ internal class ChunkRenderer
         var giPass = graphics.CommandBuffer.BeginComputePass([], [checksumsBinding, irradiancesBinding, reflectionsBinding]);
 
         giPass.BindComputeSamplers(0, [
-            new(Game.Textures.GetTextureArray(), sampler),
+            new(renderer.Textures.AlbedoTextureArray, sampler),
+            new(renderer.Textures.NormalTextureArray, sampler),
+            new(renderer.Textures.SpecularTextureArray, sampler),
             ]);
 
         giPass.BindStorageTextures(0, [
@@ -238,9 +262,9 @@ internal class ChunkRenderer
             blockMaskManager.GetMaterialIDTexture(), 
             ]);
 
-        giPass.BindStorageBuffers(0, [
-            Game.Materials.GetMaterialBuffer(),
-            ]);
+        // giPass.BindStorageBuffers(0, [
+        //     // renderer.Materials.GetMaterialBuffer(),
+        //     ]);
 
         giPass.BindPipeline(giPipeline);
 
@@ -257,7 +281,7 @@ internal class ChunkRenderer
         }
 
         uniforms.blockMasksOffset = Chunk.Size * blockMaskManager.ChunkOffset;
-        uniforms.cameraPosition = new(Game.player.Camera.transform.Position, 0);
+        uniforms.cameraPosition = new(camera.transform.Position, 0);
         graphics.CommandBuffer.PushComputeUniformData(0, ref uniforms);
 
         giPass.Dispatch((graphics.RenderTargets.Width + 15) / 16, (graphics.RenderTargets.Height + 15) / 16, 1);
@@ -293,7 +317,12 @@ internal class ChunkRenderer
 
         graphics.CommandBuffer.PushFragmentUniformData(0, ref tileUniforms);
 
-        tileRenderPass.BindFragmentSamplers(0, new TextureSamplerBinding(Game.Textures.GetTextureArray(), sampler));
+        tileRenderPass.BindFragmentSamplers(0, [
+            new(renderer.Textures.AlbedoTextureArray, sampler),
+            new(renderer.Textures.NormalTextureArray, sampler),
+            new(renderer.Textures.SpecularTextureArray, sampler),
+            ]);
+
         tileRenderPass.BindFragmentStorageTextures(0, [
             graphics.RenderTargets.PositionTexture, 
             graphics.RenderTargets.NormalTexture, 

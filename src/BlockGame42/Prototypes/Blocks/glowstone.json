@@ -1,0 +1,13 @@
+{
+  "Prototype": "SolidBlock",
+  "Name": "glowstone",
+  "Model": {
+    "Prototype": "SolidBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "glowstone",
+      "Normal": "glowstone_n",
+      "Specular": "glowstone_s"
+    }
+  }
+}

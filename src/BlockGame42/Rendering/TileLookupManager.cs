@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 namespace BlockGame42.Rendering;
 internal class TileLookupManager
 {
-    private readonly GraphicsManager graphics;
+    private readonly GraphicsContext graphics;
 
     private readonly DataBuffer checksums;
     private readonly DataBuffer tileIrradiances;
@@ -25,7 +25,7 @@ internal class TileLookupManager
     public uint CurrentFrame { get; private set; }
     public uint CurrentPhase { get; private set; }
 
-    public TileLookupManager(GraphicsManager graphics, uint phaseCount, uint tilesPerPhase, uint framesPerPhase)
+    public TileLookupManager(GraphicsContext graphics, uint phaseCount, uint tilesPerPhase, uint framesPerPhase)
     {
         this.graphics = graphics;
 

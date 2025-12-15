@@ -7,7 +7,7 @@ static class Program
 {
     static void Main()
     {
-        Game game = new();
+        GameClient game = new();
         game.Run();
     }
 }

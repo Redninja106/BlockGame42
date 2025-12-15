@@ -23,6 +23,12 @@ internal class AssetPipelineManager
 
         foreach (var file in Directory.GetFiles(directory))
         {
+            if (!pipelines.ContainsKey(Path.GetExtension(file)))
+            {
+                Console.WriteLine("Skipping file with unknown extension: " + file);
+                continue;
+            }
+
             var pipeline = pipelines[Path.GetExtension(file)];
             
             AssetBuildContext context = new(file, outDirectory);

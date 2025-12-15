@@ -1,4 +1,5 @@
 ﻿using BlockGame42.Blocks;
+using BlockGame42.Blocks.Models;
 using BlockGame42.Rendering;
 using SDL.GPU;
 using System;
@@ -16,15 +17,13 @@ internal class ChunkMesh
 {
     private const int BufferSizeIncrement = 2 * 1024;
 
-    private readonly GraphicsManager graphics;
+    private readonly GraphicsContext graphics;
     public DataBuffer VertexBuffer;
     public int VertexCount;
-    private World world;
 
-    public ChunkMesh(GraphicsManager graphics, World world)
+    public ChunkMesh(GraphicsContext graphics)
     {
         this.graphics = graphics;
-        this.world = world;
 
         VertexBuffer = this.graphics.device.CreateDataBuffer(DataBufferUsageFlags.Vertex, BufferSizeIncrement);
     }
@@ -133,6 +132,11 @@ internal class ChunkMesh
 
         BlockReference neighborBlock = block.Offset(forwardDirs[(int)direction]);// chunk.Blocks[blockOffset];
 
+        if (neighborBlock.IsNull)
+        {
+            return;
+        }
+
         BlockFaceMask faceMask = block.Prototype.Model.GetFaceMask(block.State, direction);
         BlockFaceMask neighborMask = neighborBlock.Prototype.Model.GetFaceMask(neighborBlock.State, inverseDirection);
         if ((int)direction < 4)
@@ -154,16 +158,16 @@ internal class ChunkMesh
         float ao = aos[(int)direction];
         if (visibleFaces == BlockFaceMask.Full)
         {
-            mesh.AppendBlockFace(offset, right, up, normal, block.Prototype.Model.GetMaterial(block.State).Data.Transmission[direction], block.Prototype.Model.GetMaterial(block.State).Data.Emission[direction]);
+            mesh.AppendBlockFace(offset, right, up, normal, block.Prototype.Model.Material.TexID);
         }
         else
         {
-            mesh.AppendPartialBlockFace(visibleFaces, offset.ToVector(), right.ToVector(), up.ToVector(), normal.ToVector(), block.Prototype.Model.GetMaterial(block.State).Data.Transmission[direction], block.Prototype.Model.GetMaterial(block.State).Data.Emission[direction]);
+            mesh.AppendPartialBlockFace(visibleFaces, offset.ToVector(), right.ToVector(), up.ToVector(), normal.ToVector(), block.Prototype.Model.Material.TexID);
             //mesh.AppendPartialBlockFace(visibleFaces, neighborhood, coords, offset, right, up, model.TextureIDs[direction], ao);
         }
     }
 
-    public void Build(Chunk chunk, Coordinates chunkCoordinates)
+    public void Build(World world, Chunk chunk, Coordinates chunkCoordinates)
     {
         Timer start = Timer.Start();
         scoped BlockMeshBuilder mesh = new();
@@ -239,12 +243,12 @@ ref struct BlockMeshBuilder
     // public ref readonly ChunkNeighborhood neighborhood;
     public Coordinates coordinates;
 
-    public void AppendFace(Vector3 offset, Vector3 right, Vector3 up, Vector2 uvOffset, Vector2 uvRight, Vector2 uvUp, uint textureId, uint emissionId)
+    public void AppendFace(Vector3 offset, Vector3 right, Vector3 up, Vector2 uvOffset, Vector2 uvRight, Vector2 uvUp, uint textureId)
     {
-        MinimizedChunkVertex v0 = new(coordinates.ToVector() + offset,              uvOffset,                  textureId, Vector4.One, Vector3.Cross(right, up), emissionId);
-        MinimizedChunkVertex v1 = new(coordinates.ToVector() + offset + right,      uvOffset + uvRight,        textureId, Vector4.One, Vector3.Cross(right, up), emissionId);
-        MinimizedChunkVertex v2 = new(coordinates.ToVector() + offset + right + up, uvOffset + uvRight + uvUp, textureId, Vector4.One, Vector3.Cross(right, up), emissionId);
-        MinimizedChunkVertex v3 = new(coordinates.ToVector() + offset + up,         uvOffset + uvUp,           textureId, Vector4.One, Vector3.Cross(right, up), emissionId);
+        MinimizedChunkVertex v0 = new(coordinates.ToVector() + offset,              uvOffset,                  textureId, Vector4.One, Vector3.Cross(right, up));
+        MinimizedChunkVertex v1 = new(coordinates.ToVector() + offset + right,      uvOffset + uvRight,        textureId, Vector4.One, Vector3.Cross(right, up));
+        MinimizedChunkVertex v2 = new(coordinates.ToVector() + offset + right + up, uvOffset + uvRight + uvUp, textureId, Vector4.One, Vector3.Cross(right, up));
+        MinimizedChunkVertex v3 = new(coordinates.ToVector() + offset + up,         uvOffset + uvUp,           textureId, Vector4.One, Vector3.Cross(right, up));
 
         vertices.AddRange(v0, v2, v1, v0, v3, v2);
     }
@@ -254,7 +258,7 @@ ref struct BlockMeshBuilder
         vertices = new();
     }
 
-    public void AppendPartialBlockFace(BlockFaceMask mask, Vector3 offset, Vector3 right, Vector3 up, Vector3 normal, uint blockTextureId, uint emissionId)
+    public void AppendPartialBlockFace(BlockFaceMask mask, Vector3 offset, Vector3 right, Vector3 up, Vector3 normal, uint blockTextureId)
     {
         BlockFaceMask remainingMask = mask;
         for (int index = 0; index < 16; index++) 
@@ -307,10 +311,10 @@ ref struct BlockMeshBuilder
                 }
             }
 
-            MinimizedChunkVertex v0 = new(coordinates.ToVector() + offset + ul * right + vl * up, new(ul, vl), blockTextureId, default, normal, emissionId);
-            MinimizedChunkVertex v1 = new(coordinates.ToVector() + offset + uh * right + vl * up, new(uh, vl), blockTextureId, default, normal, emissionId);
-            MinimizedChunkVertex v2 = new(coordinates.ToVector() + offset + uh * right + vh * up, new(uh, vh), blockTextureId, default, normal, emissionId);
-            MinimizedChunkVertex v3 = new(coordinates.ToVector() + offset + ul * right + vh * up, new(ul, vh), blockTextureId, default, normal, emissionId);
+            MinimizedChunkVertex v0 = new(coordinates.ToVector() + offset + ul * right + vl * up, new(ul, vl), blockTextureId, default, normal);
+            MinimizedChunkVertex v1 = new(coordinates.ToVector() + offset + uh * right + vl * up, new(uh, vl), blockTextureId, default, normal);
+            MinimizedChunkVertex v2 = new(coordinates.ToVector() + offset + uh * right + vh * up, new(uh, vh), blockTextureId, default, normal);
+            MinimizedChunkVertex v3 = new(coordinates.ToVector() + offset + ul * right + vh * up, new(ul, vh), blockTextureId, default, normal);
 
             vertices.AddRange(v0, v2, v1, v0, v3, v2);
         }
@@ -404,12 +408,12 @@ ref struct BlockMeshBuilder
 
     //}
 
-    public void AppendBlockFace(Coordinates offset, Coordinates right, Coordinates up, Coordinates normal, uint blockTextureId, uint emissionId)
+    public void AppendBlockFace(Coordinates offset, Coordinates right, Coordinates up, Coordinates normal, uint blockTextureId)
     {
-        MinimizedChunkVertex v0 = new((coordinates + offset).ToVector(), new(0, 0), blockTextureId, default, normal.ToVector(), emissionId);
-        MinimizedChunkVertex v1 = new((coordinates + offset + right).ToVector(), new(1, 0), blockTextureId, default, normal.ToVector(), emissionId);
-        MinimizedChunkVertex v2 = new((coordinates + offset + right + up).ToVector(), new(1, 1), blockTextureId, default, normal.ToVector(), emissionId);
-        MinimizedChunkVertex v3 = new((coordinates + offset + up).ToVector(), new(0, 1), blockTextureId, default, normal.ToVector(), emissionId);
+        MinimizedChunkVertex v0 = new((coordinates + offset).ToVector(), new(0, 0), blockTextureId, default, normal.ToVector());
+        MinimizedChunkVertex v1 = new((coordinates + offset + right).ToVector(), new(1, 0), blockTextureId, default, normal.ToVector());
+        MinimizedChunkVertex v2 = new((coordinates + offset + right + up).ToVector(), new(1, 1), blockTextureId, default, normal.ToVector());
+        MinimizedChunkVertex v3 = new((coordinates + offset + up).ToVector(), new(0, 1), blockTextureId, default, normal.ToVector());
 
         vertices.AddRange(v0, v2, v1, v0, v3, v2);
     }

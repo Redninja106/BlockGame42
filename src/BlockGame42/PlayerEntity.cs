@@ -1,5 +1,6 @@
 ﻿using BlockGame42.Blocks;
 using BlockGame42.Chunks;
+using Protor;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,7 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace BlockGame42;
-internal class Player : Entity
+internal class PlayerEntity : Entity
 {
     float cx, cy;
     Vector3 velocity;
@@ -26,14 +27,14 @@ internal class Player : Entity
     MouseButtonFlags lastMouseButtons;
     bool[]? lastKeyboardState;
 
-    public Player(World world) : base(world)
+    public PlayerEntity(World world) : base(world)
     {
     }
 
     public void Update(float deltatime)
     {
         MouseButtonFlags mouseButtons = Mouse.GetRelativeState(out float mouseX, out float mouseY);
-        var window = World.Graphics.Window;
+        // var window = (World. as GameClient).Graphics.Window;
 
         KeyboardState keyboard = Keyboard.GetState();
 
@@ -68,7 +69,7 @@ internal class Player : Entity
             Ray ray = new(this.Camera.transform.Position, this.Camera.transform.Forward, 100);
             if (World.Raycast(ray, out float t, out Coordinates hitCoords, out Coordinates normal))
             {
-                World.SetBlock(hitCoords, Game.Blocks.Air);
+                World.SetBlock(hitCoords, BlockRegistry.Air);
             }
         }
 
@@ -115,7 +116,7 @@ internal class Player : Entity
 
         if (keyboard[Scancode.L])
         {
-            Game.gameRenderer.ChunkRenderer.sundir = new Vector4(-this.Transform.Forward, 1);
+            // Game.gameRenderer.ChunkRenderer.sundir = new Vector4(-this.Transform.Forward, 1);
         }
 
         if ((mouseButtons & MouseButtonFlags.Middle) != 0 && (lastMouseButtons & MouseButtonFlags.Middle) == 0)
@@ -140,18 +141,18 @@ internal class Player : Entity
         lastKeyboardState = keyboard.ToArray();
     }
 
-    string[] nameArray = ["stone", "glowstone", "dirt", "iron block"];
-    Block[] placementArray = [Game.Blocks.Stone, Game.Blocks.Glowstone, Game.Blocks.Dirt, Game.Blocks.IronBlock];
+    string[] nameArray = ["stone", "glowstone", "dirt", "iron block", "player", "redstone lamp on"];
+    Block[] placementArray = [BlockRegistry.Stone, BlockRegistry.Glowstone, BlockRegistry.Dirt, BlockRegistry.IronBlock, Registry.Get<Block>("redstone_lamp_on")];
     int placementIdx = 0;
 
-    public void Render()
+    public void Render(GameRenderer renderer)
     {
         Ray ray = new(Camera.transform.Position, Camera.transform.Forward, 100);
-        Game.gameRenderer.GUIRenderer.PushText(Game.gameRenderer.Font, nameArray[placementIdx], new(5,30), 0xFFFFFFFF);
+        renderer.GUIRenderer.PushText(renderer.Font, nameArray[placementIdx], new(5,30), 0xFFFFFFFF);
         
         if (World.Raycast(ray, out float t, out Coordinates hitCoords, out Coordinates normal))
         {
-            Game.gameRenderer.GUIRenderer.PushText(Game.gameRenderer.Font, World.GetBlockReference(hitCoords).Support.ToString(), new(Game.graphics.Window.Width/2f,Game.graphics.Window.Height/2f), 0xFFFFFFFF);
+            renderer.GUIRenderer.PushText(renderer.Font, World.GetBlockReference(hitCoords).Support.ToString(), new(renderer.Graphics.Window.Width/2f, renderer.Graphics.Window.Height/2f), 0xFFFFFFFF);
         }
     }
 

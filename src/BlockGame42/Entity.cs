@@ -9,8 +9,6 @@ using System.Threading.Tasks;
 namespace BlockGame42;
 internal abstract class Entity
 {
-    public World World { get; }
-
     public ref Transform Transform => ref transform;
     public ref Transform InterpolatedTransform => ref interpolatedTransform;
     public ref Transform PreviousTransform => ref previousTransform;
@@ -20,6 +18,8 @@ internal abstract class Entity
     private Transform transform;
 
     private Coordinates chunkCoordinates;
+
+    protected World World { get; }
 
     public Entity(World world)
     {
@@ -44,8 +44,8 @@ internal abstract class Entity
         Coordinates newChunkCoordinates = GetChunkCoordinates();
         if (newChunkCoordinates != this.chunkCoordinates)
         {
-            World.Chunks.chunkMap[chunkCoordinates].Item1.Entities.Remove(this);
-            World.Chunks.chunkMap[newChunkCoordinates].Item1.Entities.Add(this);
+            World.Chunks.At(chunkCoordinates)!.Entities.Remove(this);
+            World.Chunks.At(newChunkCoordinates)!.Entities.Add(this);
             this.chunkCoordinates = newChunkCoordinates;
         }
         previousTransform = transform;
@@ -53,7 +53,7 @@ internal abstract class Entity
 
     public virtual void Update()
     {
-        interpolatedTransform = Transform.Lerp(this.previousTransform, this.transform, Game.TickProgress);
+        interpolatedTransform = Transform.Lerp(this.previousTransform, this.transform, GameClient.TickProgress);
     }
 
     public virtual void Draw(CommandBuffer commandBuffer, RenderPass pass)

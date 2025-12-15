@@ -1,0 +1,13 @@
+{
+  "Prototype": "SolidBlock",
+  "Name": "redstone_lamp_on",
+  "Model": {
+    "Prototype": "SolidBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "redstone_lamp_on",
+      "Normal": "redstone_lamp_on_n",
+      "Specular": "redstone_lamp_on_s"
+    }
+  }
+}

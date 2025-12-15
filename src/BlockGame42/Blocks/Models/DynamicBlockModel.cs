@@ -7,21 +7,22 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BlockGame42.Blocks;
+namespace BlockGame42.Blocks.Models;
 internal class DynamicBlockModel : BlockModel
 {
-    Material textureSet;
+    MaterialData Textures;
     DynamicBlockMeshManager meshes;
 
-    public DynamicBlockModel(Material textureSet)
+    public DynamicBlockModel()
     {
-        this.textureSet = textureSet;
-        meshes = new(Game.graphics, this);
+        //meshes = new(Game.graphics, this);
     }
 
-    public override Material GetMaterial(BlockState state)
+    public override void InitializePrototype()
     {
-        return textureSet;
+        base.InitializePrototype();
+
+
     }
 
     //public override uint GetTextureID(BlockState state, Direction direction)
@@ -29,8 +30,70 @@ internal class DynamicBlockModel : BlockModel
     //    return textureId;
     //}
 
+    private static BlockFaceMask[,] faceMaskTable;
+
+    static DynamicBlockModel()
+    {
+        faceMaskTable = new BlockFaceMask[6, 256];
+        for (int d = 0; d < 6; d++)
+        {
+            for (int s = 0; s < 256; s++)
+            {
+                BlockFaceMask result = 0;
+
+                BlockState state = default;
+                state.DynamicBlock.Mask = (byte)s;
+
+                switch ((Direction)d)
+                {
+                    case Direction.East:
+                        if (state.DynamicBlock[0b001]) result |= BlockFaceMask.BottomRight;
+                        if (state.DynamicBlock[0b011]) result |= BlockFaceMask.BottomLeft;
+                        if (state.DynamicBlock[0b101]) result |= BlockFaceMask.TopRight;
+                        if (state.DynamicBlock[0b111]) result |= BlockFaceMask.TopLeft;
+                        break;
+                    case Direction.South:
+                        if (state.DynamicBlock[0b010]) result |= BlockFaceMask.BottomLeft;
+                        if (state.DynamicBlock[0b011]) result |= BlockFaceMask.BottomRight;
+                        if (state.DynamicBlock[0b110]) result |= BlockFaceMask.TopLeft;
+                        if (state.DynamicBlock[0b111]) result |= BlockFaceMask.TopRight;
+                        break;
+                    case Direction.West:
+                        if (state.DynamicBlock[0b000]) result |= BlockFaceMask.BottomLeft;
+                        if (state.DynamicBlock[0b010]) result |= BlockFaceMask.BottomRight;
+                        if (state.DynamicBlock[0b100]) result |= BlockFaceMask.TopLeft;
+                        if (state.DynamicBlock[0b110]) result |= BlockFaceMask.TopRight;
+                        break;
+                    case Direction.North:
+                        if (state.DynamicBlock[0b000]) result |= BlockFaceMask.BottomRight;
+                        if (state.DynamicBlock[0b001]) result |= BlockFaceMask.BottomLeft;
+                        if (state.DynamicBlock[0b100]) result |= BlockFaceMask.TopRight;
+                        if (state.DynamicBlock[0b101]) result |= BlockFaceMask.TopLeft;
+                        break;
+                    case Direction.Up:
+                        if (state.DynamicBlock[0b100]) result |= BlockFaceMask.TopLeft;
+                        if (state.DynamicBlock[0b101]) result |= BlockFaceMask.TopRight;
+                        if (state.DynamicBlock[0b110]) result |= BlockFaceMask.BottomLeft;
+                        if (state.DynamicBlock[0b111]) result |= BlockFaceMask.BottomRight;
+                        break;
+                    case Direction.Down:
+                        if (state.DynamicBlock[0b000]) result |= BlockFaceMask.TopRight;
+                        if (state.DynamicBlock[0b001]) result |= BlockFaceMask.TopLeft;
+                        if (state.DynamicBlock[0b010]) result |= BlockFaceMask.BottomRight;
+                        if (state.DynamicBlock[0b011]) result |= BlockFaceMask.BottomLeft;
+                        break;
+                }
+
+                faceMaskTable[d, s] = result;
+            }
+        }
+
+    }
+
     public override BlockFaceMask GetFaceMask(BlockState state, Direction direction)
     {
+        return faceMaskTable[(int)direction, state.DynamicBlock.Mask];
+
         BlockFaceMask result = 0;
         switch (direction)
         {
@@ -113,7 +176,7 @@ internal class DynamicBlockModel : BlockModel
         //return result;
     }
 
-    public override BlockMesh GetMesh(BlockState state, out Matrix4x4 transform)
+    public override BlockMesh CreateMesh(GraphicsContext graphics, BlockState state, out Matrix4x4 transform)
     {
         transform = Matrix4x4.Identity;
         return meshes.Get(state);
@@ -138,8 +201,7 @@ internal class DynamicBlockModel : BlockModel
                 right.ToVector(),
                 up.ToVector(),
                 forward.ToVector(),
-                GetMaterial(state).Data.Transmission[direction],
-                GetMaterial(state).Data.Emission[direction]
+                this.Material.TexID
             );
         }
 
@@ -175,57 +237,6 @@ internal class DynamicBlockModel : BlockModel
         */
     }
 
-    public override bool Intersect(BlockState state, Box box)
-    {
-        foreach (var localColliders in GetLocalColliders(state))
-        {
-            if (localColliders.Intersects(box))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private List<Box> GetLocalColliders(BlockState state)
-    {
-        if (state.DynamicBlock.Mask == 0xFF)
-            return [new Box(Vector3.Zero, Vector3.One)];
-
-        List<Box> result = [];
-        // 0bYZX
-        if (state.DynamicBlock[0b000]) result.Add(new Box(new(0.0f, 0.0f, 0.0f), new(0.5f, 0.5f, 0.5f)));
-        if (state.DynamicBlock[0b001]) result.Add(new Box(new(0.5f, 0.0f, 0.0f), new(1.0f, 0.5f, 0.5f)));
-        if (state.DynamicBlock[0b010]) result.Add(new Box(new(0.0f, 0.0f, 0.5f), new(0.5f, 0.5f, 1.0f)));
-        if (state.DynamicBlock[0b011]) result.Add(new Box(new(0.5f, 0.0f, 0.5f), new(1.0f, 0.5f, 1.0f)));
-        if (state.DynamicBlock[0b100]) result.Add(new Box(new(0.0f, 0.5f, 0.0f), new(0.5f, 1.0f, 0.5f)));
-        if (state.DynamicBlock[0b101]) result.Add(new Box(new(0.5f, 0.5f, 0.0f), new(1.0f, 1.0f, 0.5f)));
-        if (state.DynamicBlock[0b110]) result.Add(new Box(new(0.0f, 0.5f, 0.5f), new(0.5f, 1.0f, 1.0f)));
-        if (state.DynamicBlock[0b111]) result.Add(new Box(new(0.5f, 0.5f, 0.5f), new(1.0f, 1.0f, 1.0f)));
-        return result;
-    }
-
-    public override bool Raycast(BlockState state, Ray ray, ref float t, ref Coordinates normal)
-    {
-        var localColliders = GetLocalColliders(state);
-
-        t = float.PositiveInfinity;
-        foreach (var collider in localColliders)
-        {
-            if (collider.Raycast(ray, out float tNear, out float tFar, out Coordinates hitNormal))
-            {
-                float hitT = tNear > 0 ? tNear : tFar;
-                if (hitT > 0 && hitT < t)
-                {
-                    t = hitT;
-                    normal = hitNormal;
-                }
-            }
-        }
-        return t != float.PositiveInfinity;
-    }
-
     public override ulong GetVolumeMask(BlockState state)
     {
         return state.DynamicBlock.GetBlockMask64();
@@ -234,12 +245,12 @@ internal class DynamicBlockModel : BlockModel
 
 class DynamicBlockMeshManager
 {
-    private readonly GraphicsManager graphics;
+    private readonly GraphicsContext graphics;
     private readonly BlockModel model;
 
     BlockMesh?[] meshes = new BlockMesh?[256];
 
-    public DynamicBlockMeshManager(GraphicsManager graphics, BlockModel model)
+    public DynamicBlockMeshManager(GraphicsContext graphics, BlockModel model)
     {
         this.graphics = graphics;
         this.model = model;

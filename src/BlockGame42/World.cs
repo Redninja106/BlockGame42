@@ -2,6 +2,7 @@
 using BlockGame42.Chunks;
 using BlockGame42.Rendering;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -12,19 +13,16 @@ using System.Threading.Tasks;
 namespace BlockGame42;
 internal class World
 {
-    private ChunkManager chunks;
-    private GraphicsManager graphics;
-
-    public GraphicsManager Graphics => graphics;
-    public ChunkManager Chunks => chunks;
+    public ChunkMap Chunks { get; }
 
     private List<Entity> deletedEntities = [];
 
-    public World(GraphicsManager graphics)
+    public World()
     {
-        this.graphics = graphics;
-        chunks = new(this, graphics);
-        chunks.Initialize();
+        Chunks = new();
+
+        // Chunks.Initialize();
+        // chunkManager = new(null);
 
         //foreach (var (chunkCoords, (chunk, mesh)) in chunks.chunkMap)
         //{
@@ -46,19 +44,14 @@ internal class World
         //}
     }
 
-    Block nullBlock = Game.Blocks.Unloaded;
-    BlockState nullBlockState;
-    byte nullSupport;
-    ulong nullMask;
-
     public BlockReference GetBlockReference(Coordinates worldCoordinates)
     {
         Chunk.DecomposeCoordinates(worldCoordinates, out Coordinates chunkCoordinates, out Coordinates localCoordinates);
-        Chunk? chunk = Chunks.chunkMap.GetValueOrDefault(chunkCoordinates).Item1;
+        Chunk? chunk = Chunks.At(chunkCoordinates);
 
         if (chunk == null)
         {
-            return new BlockReference(this, null, chunkCoordinates, worldCoordinates, ref nullBlock, ref nullBlockState, ref nullSupport, ref nullMask);
+            return default;
         }
 
         return new BlockReference(
@@ -75,7 +68,7 @@ internal class World
 
     public void Update()
     {
-        chunks.Update(Vector3.Zero);
+        Chunks.Update();
     }
 
     public bool Raycast(Ray ray, out float outT, out Coordinates outHitCoords, out Coordinates outNormal)
@@ -121,13 +114,13 @@ internal class World
             //}
 
             Coordinates chunkCoords = Chunk.ChunkCoordinatesFromWorldPosition(voxel.ToVector());
-            if (chunks.chunkMap.TryGetValue(chunkCoords, out var chunk))
+            if (Chunks.At(chunkCoords) is Chunk chunk)
             {
-                Block block = chunk.Item1.Blocks[voxel - chunkCoords * Chunk.Size];
-                BlockState blockState = chunk.Item1.BlockStates[voxel - chunkCoords * Chunk.Size];
+                Block block = chunk.Blocks[voxel - chunkCoords * Chunk.Size];
+                BlockState blockState = chunk.BlockStates[voxel - chunkCoords * Chunk.Size];
                 Ray localRay = ray;
                 localRay.Origin -= voxel.ToVector();
-                if (block.Model.Raycast(blockState, localRay, ref t, ref outNormal))
+                if (block.Raycast(blockState, localRay, ref t, ref outNormal))
                 {
                     outT = t;
                     outHitCoords = voxel;
@@ -187,10 +180,10 @@ internal class World
     public Block? GetBlock(Coordinates coordinates, out BlockState state)
     {
         Chunk.DecomposeCoordinates(coordinates, out Coordinates chunkCoords, out Coordinates localCoords);
-        if (chunks.chunkMap.TryGetValue(chunkCoords, out var chunkInfo))
+        if (Chunks.At(chunkCoords) is Chunk chunk)
         {
-            state = chunkInfo.Item1.BlockStates[localCoords];
-            return chunkInfo.Item1.Blocks[localCoords];
+            state = chunk.BlockStates[localCoords];
+            return chunk.Blocks[localCoords];
         }
         else
         {
@@ -231,7 +224,7 @@ internal class World
     public void AddEntity(Entity entity)
     {
         Coordinates chunkCoordinates = entity.GetChunkCoordinates();
-        this.Chunks.chunkMap[chunkCoordinates].Item1.Entities.Add(entity);
+        this.Chunks.At(chunkCoordinates)?.Entities.Add(entity);
     }
 
     public bool Intersect(Box box, Vector3 offset = default)
@@ -253,7 +246,7 @@ internal class World
                     Box localBox = box;
                     localBox.Min = localBox.Min + offset - new Vector3(x, y, z);
                     localBox.Max = localBox.Max + offset - new Vector3(x, y, z);
-                    if (block != null && block.Model.Intersect(state, localBox))
+                    if (block != null && block.Intersect(state, localBox))
                     {
                         return true;
                     }
@@ -266,11 +259,11 @@ internal class World
 
     public void Tick()
     {
-        chunks.Tick();
+        Chunks.Tick();
 
         foreach (var entity in deletedEntities)
         {
-            Chunk chunk = chunks.chunkMap[entity.GetChunkCoordinates()].Item1;
+            Chunk chunk = Chunks.At(entity.GetChunkCoordinates());
             if (!chunk.Entities.Remove(entity)) 
             {
                 Debug.Assert(false);
@@ -291,13 +284,16 @@ internal class World
 
     public void UpdateBlock(in BlockReference block)
     {
-        block.Prototype.OnUpdate(this, in block);
+        if (!block.IsNull)
+        {
+            block.Prototype.OnUpdate(this, in block);
+        }
         // UpdateSupport(block);
     }
 
     public void UpdateSupport(in BlockReference block, bool weak = false)
     {
-        if (block.Prototype == Game.Blocks.Air)
+        if (block.Prototype == BlockRegistry.Air)
         {
             return;
         }
@@ -364,8 +360,50 @@ internal class World
     public byte GetSupport(Coordinates blockCoordinates)
     {
         Chunk.DecomposeCoordinates(blockCoordinates, out var chunkCoords, out var localCoords);
-        return chunks.chunkMap[chunkCoords].Item1.Support[localCoords];
+        return Chunks.At(chunkCoords)!.Support[localCoords];
     }
+}
+
+class ChunkMap : IEnumerable<KeyValuePair<Coordinates, Chunk>>
+{
+    private readonly Dictionary<Coordinates, Chunk> map = [];
+
+    public Chunk? At(Coordinates chunkCoordinates)
+    {
+        return map.GetValueOrDefault(chunkCoordinates);
+    }
+
+    public void Insert(Coordinates coordinates, Chunk chunk)
+    {
+        map.Add(coordinates, chunk);
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
+
+    public IEnumerator<KeyValuePair<Coordinates, Chunk>> GetEnumerator()
+    {
+        return map.GetEnumerator();
+    }
+
+    public void Tick()
+    {
+        foreach (var (_, chunk) in map)
+        {
+            chunk.Tick();
+        }
+    }
+
+    internal void Update()
+    {
+        foreach (var (_, chunk) in map)
+        {
+            chunk.Update();
+        }
+    }
+
 }
 
 readonly struct ChunkNeighborhood

@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 namespace BlockGame42.Rendering;
 internal class BlockMaskManager
 {
-    private readonly GraphicsManager graphics;
+    private readonly GraphicsContext graphics;
     // private readonly DataBuffer blockMaskBuffer;
     private readonly Texture blockMaskTexture;
     private readonly Texture materialIDTexture;
@@ -24,7 +24,7 @@ internal class BlockMaskManager
     
     public Coordinates ChunkOffset { get; private set; }
 
-    public BlockMaskManager(GraphicsManager graphics, int width, int height, int depth)
+    public BlockMaskManager(GraphicsContext graphics, int width, int height, int depth)
     {
         this.graphics = graphics;
         this.width = width;
@@ -85,7 +85,7 @@ internal class BlockMaskManager
         return materialIDTexture;
     }
 
-    public void UpdateChunk(CommandBuffer commandBuffer, Coordinates chunkCoordinates, Chunk chunk, ChunkMesh chunkMesh)
+    public void UpdateChunk(CommandBuffer commandBuffer, Coordinates chunkCoordinates, Chunk chunk)
     {
         // copy into transfer buffer
         Span<byte> mappedUploadBuffer = uploadBuffer.Map(true);
@@ -100,7 +100,7 @@ internal class BlockMaskManager
             {
                 for (int x = 0; x < 32; x++)
                 {
-                    mappedMaterialIDs[y * 32 * 32 + z * 32 + x] = (ushort)Game.Materials.Get(chunk.Blocks[x, y, z].Model.GetMaterial(chunk.BlockStates[x, y, z]));
+                    mappedMaterialIDs[y * 32 * 32 + z * 32 + x] = (ushort)chunk.Blocks[x, y, z].Model.Material.TexID;
                 }
             }
         }
@@ -132,9 +132,9 @@ internal class BlockMaskManager
         computePass.End();
     }
 
-    public void DrawDebugOverlay()
+    public void DrawDebugOverlay(GameRenderer renderer)
     {
-        Game.gameRenderer.OverlayRenderer.PushBox(new(new(-width/2, 0, -depth/2), new(width/2, height, depth/2)), 0xFF343434);
+        renderer.Overlays.PushBox(new(new(-width/2, 0, -depth/2), new(width/2, height, depth/2)), 0xFF343434);
     }
 
     struct WorldBlockMaskInfo

@@ -1,5 +1,6 @@
 #include "sdl.slang"
 #include "hash.slang"
+#include "util.slang"
 
 struct TileRecord
 {
@@ -16,12 +17,13 @@ SDL_FS_RESOURCE(1, Texture2DArray<float4> normalTextureArray);
 SDL_FS_RESOURCE(2, Texture2DArray<float4> specularTextureArray);
 
 SDL_FS_RESOURCE(3, Texture2D<float4> positionTarget);
-SDL_FS_RESOURCE(4, Texture2D<float4> normalTarget);
-SDL_FS_RESOURCE(5, Texture2D<float4> texCoordTarget);
+SDL_FS_RESOURCE(4, Texture2D<float4> albedoTarget);
+SDL_FS_RESOURCE(5, Texture2D<float4> normalTarget);
+SDL_FS_RESOURCE(6, Texture2D<float4> specularTarget);
 
-SDL_FS_RESOURCE(6, StructuredBuffer<uint> tileChecksums);
-SDL_FS_RESOURCE(7, StructuredBuffer<uint4> tileIrradiances);
-SDL_FS_RESOURCE(8, StructuredBuffer<uint4> tileReflections);
+SDL_FS_RESOURCE(7, StructuredBuffer<uint> tileChecksums);
+SDL_FS_RESOURCE(8, StructuredBuffer<uint4> tileIrradiances);
+SDL_FS_RESOURCE(9, StructuredBuffer<uint4> tileReflections);
 
 struct Uniforms
 {
@@ -65,13 +67,20 @@ uint find(uint phase, float3 position, float3 normal, float detail)
 float4 main(float4 position : SV_Position) : SV_Target
 {
     uint2 location = uint2(position.xy);
-    float3 position = positionTarget[location].xyz;
-    float3 normal = normalTarget[location].xyz;
-    float4 texCoords = texCoordTarget[location];
 
-    float4 albedo = albedoTextureArray.Sample(sampler, texCoords.xyz);
-    float4 sampledNormal = normalTextureArray.Sample(sampler, texCoords.xyz);
-    float4 specular = specularTextureArray.Sample(sampler, texCoords.xyz);
+    float4 pos_and_norm = positionTarget[location];
+    float4 albedo = albedoTarget[location];
+    float4 encoded_normal = normalTarget[location];
+    float4 specular = specularTarget[location];
+
+    float3 position = pos_and_norm.xyz;
+    float3 original_normal = unpackSnorm4x8ToFloat(asuint(pos_and_norm.w)).xyz;
+
+    float3 normal;
+    normal.xy = encoded_normal.xy;
+    normal.z = sqrt(1 - dot(normal.xy, normal.xy));
+
+    // return float4(original_normal * .5 + .5, 1);
 
     float emission = specular.a;
     if (emission == 1)
@@ -86,7 +95,6 @@ float4 main(float4 position : SV_Position) : SV_Target
         return float4(.392f, .584f, .929f, 1);
     }
 
-
     // return float4((tileLookup[int(position.y) * 1920 + int(position.x)].accumulatedCount).xxx / 32.0, 1);
     // return float4(sin((idx * 1234.678954) % 15634.51414), sin((idx * 6243.16324) % 7123.72346), sin((idx * 2645.6234) % 6234.172378), 1);
     // return float4((conflicts).xxx / 32.0, 1);
@@ -95,7 +103,7 @@ float4 main(float4 position : SV_Position) : SV_Target
     float4 total_irradiance = 0;
     for (int i = 0; i < uniforms.phaseCount; i++)
     {
-        uint idx = find(i, position, normal, hash_detail(position, uniforms.cameraPosition.xyz));
+        uint idx = find(i, position, original_normal, hash_detail(position, uniforms.cameraPosition.xyz));
 
         if (idx == 0xFFFFFFFF)
         {
@@ -125,7 +133,7 @@ float4 main(float4 position : SV_Position) : SV_Target
     total_irradiance.xyz /= total_irradiance.w;
 
     // base color is texture * irradiance * ao
-    float3 color = albedo.xyz * total_irradiance.xyz * sampledNormal.z * texCoords.w; // texCoord.w is parallax AO
+    float3 color = albedo.xyz * total_irradiance.xyz * encoded_normal.z;
 
     // mix in reflection
     if (total_reflection.w > 0)

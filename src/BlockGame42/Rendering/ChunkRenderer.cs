@@ -47,9 +47,9 @@ internal class ChunkRenderer
             FragmentShader = graphics.shaders.Get("deferred_chunk_fs"),
             TargetInfo = new GraphicsPipelineTargetInfo([
                 new ColorTargetDescription(TextureFormat.R32G32B32A32_Float, default),
-                new ColorTargetDescription(TextureFormat.R32G32B32A32_Float, default),
-                new ColorTargetDescription(TextureFormat.R32G32B32A32_Float, default),
-                new ColorTargetDescription(TextureFormat.R32_UInt, default),
+                new ColorTargetDescription(TextureFormat.R8G8B8A8_UNorm, default),
+                new ColorTargetDescription(TextureFormat.R8G8B8A8_UNorm, default),
+                new ColorTargetDescription(TextureFormat.R8G8B8A8_UNorm, default),
                 ], 
                 TextureFormat.D24_UNorm_S8_UInt,
                 true
@@ -175,11 +175,11 @@ internal class ChunkRenderer
             Texture = graphics.RenderTargets.PositionTexture,
             LoadOp = LoadOp.Load,
             StoreOp = StoreOp.Store,
-        }; 
-        
-        ColorTargetInfo texCoordTarget = new()
+        };
+
+        ColorTargetInfo albedoTarget = new()
         {
-            Texture = graphics.RenderTargets.TexCoordTexture,
+            Texture = graphics.RenderTargets.AlbedoTexture,
             LoadOp = LoadOp.Load,
             StoreOp = StoreOp.Store,
         };
@@ -190,14 +190,13 @@ internal class ChunkRenderer
             LoadOp = LoadOp.Load,
             StoreOp = StoreOp.Store,
         };
-
-        ColorTargetInfo texelIDTarget = new()
+        
+        ColorTargetInfo specularTarget = new()
         {
-            Texture = graphics.RenderTargets.TexelIDTexture,
+            Texture = graphics.RenderTargets.SpecularTexture,
             LoadOp = LoadOp.Load,
             StoreOp = StoreOp.Store,
         };
-
         DepthStencilTargetInfo depthStencilTarget = new()
         {
             Texture = graphics.RenderTargets.DepthStencilTexture,
@@ -205,7 +204,7 @@ internal class ChunkRenderer
             StoreOp = StoreOp.Store,
         };
 
-        var renderPass = graphics.CommandBuffer.BeginRenderPass([positionTarget, texCoordTarget, normalTarget, texelIDTarget], depthStencilTarget);
+        var renderPass = graphics.CommandBuffer.BeginRenderPass([positionTarget, albedoTarget, normalTarget, specularTarget], depthStencilTarget);
 
         renderPass.BindPipeline(chunkPipeline);
 
@@ -255,8 +254,9 @@ internal class ChunkRenderer
 
         giPass.BindStorageTextures(0, [
             graphics.RenderTargets.PositionTexture, 
-            graphics.RenderTargets.NormalTexture, 
-            graphics.RenderTargets.TexCoordTexture,
+            graphics.RenderTargets.AlbedoTexture, 
+            graphics.RenderTargets.NormalTexture,
+            graphics.RenderTargets.SpecularTexture,
 
             blockMaskManager.GetBlockMaskTexture(),
             blockMaskManager.GetMaterialIDTexture(), 
@@ -324,9 +324,10 @@ internal class ChunkRenderer
             ]);
 
         tileRenderPass.BindFragmentStorageTextures(0, [
-            graphics.RenderTargets.PositionTexture, 
-            graphics.RenderTargets.NormalTexture, 
-            graphics.RenderTargets.TexCoordTexture,
+            graphics.RenderTargets.PositionTexture,
+            graphics.RenderTargets.AlbedoTexture,
+            graphics.RenderTargets.NormalTexture,
+            graphics.RenderTargets.SpecularTexture,
             ]);
         tileRenderPass.BindFragmentStorageBuffers(0, [
             tileLookupManager.GetChecksums(), 

@@ -1,6 +1,7 @@
 #include "sdl.slang"
 #include "random.slang"
 #include "hash.slang"
+#include "util.slang"
 
 struct MaterialData
 {
@@ -22,11 +23,12 @@ SDL_CS_RESOURCE(1, Texture2DArray<float4> normalTextureArray);
 SDL_CS_RESOURCE(2, Texture2DArray<float4> specularTextureArray);
 
 SDL_CS_RESOURCE(3, Texture2D<float4> positionTarget);
-SDL_CS_RESOURCE(4, Texture2D<float4> normalTarget);
-SDL_CS_RESOURCE(5, Texture2D<float4> texCoordTarget);
+SDL_CS_RESOURCE(4, Texture2D<float4> albedoTarget);
+SDL_CS_RESOURCE(5, Texture2D<float4> normalTarget);
+SDL_CS_RESOURCE(6, Texture2D<float4> specularTarget);
 
-SDL_CS_RESOURCE(6, Texture3D<uint2> blockMasks);
-SDL_CS_RESOURCE(7, Texture3D<uint> materialIds);
+SDL_CS_RESOURCE(7, Texture3D<uint2> blockMasks);
+SDL_CS_RESOURCE(8, Texture3D<uint> materialIds);
 
 // SDL_CS_RESOURCE(8, StructuredBuffer<MaterialData> materials)
 
@@ -50,9 +52,15 @@ static Random random;
 [numthreads(16, 16, 1)]
 void main(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    float3 position = positionTarget[dispatchThreadID.xy].xyz;
-    float3 normal = normalTarget[dispatchThreadID.xy].xyz;
-    float4 texCoord = texCoordTarget[dispatchThreadID.xy];
+    float4 pos_and_norm = positionTarget[dispatchThreadID.xy];
+    float4 encoded_normal = normalTarget[dispatchThreadID.xy];
+    float4 specular = specularTarget[dispatchThreadID.xy];
+    // float4 albedo = specularTarget[dispatchThreadID.xy];
+
+    float3 position = pos_and_norm.xyz;
+    float3 original_normal = unpackSnorm4x8ToFloat(asuint(pos_and_norm.w)).xyz;
+
+    float3 normal = original_normal;// decode_normal(encoded_normal.xy);
 
     random.seed = uniforms.ticks * 0x3f05aa5f +
                   (dispatchThreadID.x + 0x8523) * 0xb7e35a7d + 
@@ -84,26 +92,18 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     for (int i = 0; i < samples; i++)
     {
         Ray sample_ray;
-        sample_ray.origin = position + normal * .0001;
+        sample_ray.origin = position + original_normal * .0001;
         sample_ray.direction = normalize(normal + random.NextUnitVector());
         sample_ray.inverseDirection = 1 / sample_ray.direction;
         sample_ray.length = 64;
-        
+
         totalColor += ray_color(sample_ray, normal);
     }
     totalColor *= (1.0 / samples);
     // totalColor = (1 - reflectiveness) * totalColor + reflectiveness * reflection_color;
+    //totalColor = original_normal * .5 + .5;
 
-    float3x3 tbn = calc_face_tbn_matrix(normal);
-
-    // float4 sampledNormal = normalTextureArray.SampleLevel(sampler, texCoord.xyz, 0);
-    // float3 n;
-    // n.xy = sampledNormal.xy * 2 - 1;
-    // n.z = sqrt(1.0 - dot(n.xy, n.xy));
-    // float3 worldNormal = normalize(mul(tbn, n));
-    // totalColor = worldNormal * .5 + .5;
-
-    uint idx = find_or_insert(position, normal, hash_detail(position, uniforms.cameraPosition.xyz));
+    uint idx = find_or_insert(position, original_normal, hash_detail(position, uniforms.cameraPosition.xyz));
     InterlockedAdd(tileIrradiances[idx].r, int(255 * totalColor.r));
     InterlockedAdd(tileIrradiances[idx].g, int(255 * totalColor.g));
     InterlockedAdd(tileIrradiances[idx].b, int(255 * totalColor.b));
@@ -113,7 +113,7 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     // float2 uv = calc_face_uv(frac(position), normal);
 
     // float4 sampledNormal = normalTextureArray.SampleLevel(sampler, texCoord.xyz, 0);
-    float4 specular = specularTextureArray.SampleLevel(sampler, texCoord.xyz, 0);
+    // float4 specular = specularTextureArray.SampleLevel(sampler, texCoord.xyz, 0);
 
     float reflection = specular.g <= 229 ? specular.g : 0;
 
@@ -199,9 +199,7 @@ float3 ray_color(Ray ray, float3 normal)
             
             float3x3 tbn = calc_face_tbn_matrix(hitNormal);
             float4 sampledNormal = normalTextureArray.SampleLevel(sampler, uvw, 0);
-            float3 n;
-            n.xy = sampledNormal.xy * 2 - 1;
-            n.z = sqrt(1.0 - dot(n.xy, n.xy));
+            float3 n = decode_normal(sampledNormal.xy);
             float3 worldNormal = normalize(mul(tbn, n));
             // transmission[i] = materialTextures.SampleLevel(sampler, float3(uv, material.transmissions[0]), 0).xyz;
 
@@ -381,15 +379,6 @@ float2 calc_face_uv(float3 hitPos, float3 hitNormal)
     float u = select(n.x != 0, -hitPos.z * n.x, hitPos.x * select(n.y != 0, n.y, n.z));
     float v = select(n.y != 0, hitPos.z * n.y, -hitPos.y);
     return frac(float2(u, v));
-}
-
-float3x3 calc_face_tbn_matrix(float3 hitNormal)
-{
-    int3 n = sign(hitNormal);
-    float3 tangent = select(n.x != 0, n.x * float3(0, 0, 1), float3(1, 0, 0) * select(n.y != 0, n.y, -n.z));
-    float3 bitangent = select(n.y != 0, n.y * float3(0, 0, 1), float3(0, 1, 0));
-
-    return float3x3(tangent, bitangent, hitNormal);
 }
 
 struct Box

@@ -23,15 +23,15 @@ internal class ShaderPipeline : AssetPipeline
         string? shaderModel = null;
         if (source.Contains("""[shader("vertex")]"""))
         {
-            shaderModel = "vs_6_5";
+            shaderModel = "vs_6_6";
         }
         else if (source.Contains("""[shader("fragment")]"""))
         {
-            shaderModel = "ps_6_5";
+            shaderModel = "ps_6_6";
         }
         else if (source.Contains("""[shader("compute")]"""))
         {
-            shaderModel = "cs_6_5";
+            shaderModel = "cs_6_6";
             isComputeShader = true;
         }
         else

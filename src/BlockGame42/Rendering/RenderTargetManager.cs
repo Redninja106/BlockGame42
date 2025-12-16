@@ -17,10 +17,11 @@ internal class RenderTargetManager
     public Texture SwapchainTexture;
 
     public Texture PositionTexture;
-    public Texture TexCoordTexture;
+    public Texture AlbedoTexture;
     public Texture NormalTexture;
+    public Texture SpecularTexture;
+
     public Texture DepthStencilTexture;
-    public Texture TexelIDTexture;
 
     public RenderTargetManager(Device device)
     {
@@ -62,22 +63,21 @@ internal class RenderTargetManager
                 );
 
             ResizeTexture(
-                ref TexCoordTexture,
-                TextureFormat.R32G32B32A32_Float,
+                ref AlbedoTexture,
+                TextureFormat.R8G8B8A8_UNorm,
                 TextureUsageFlags.ColorTarget | TextureUsageFlags.ComputeStorageRead
                 );
 
             ResizeTexture(
                 ref NormalTexture,
-                TextureFormat.R32G32B32A32_Float,
+                TextureFormat.R8G8B8A8_UNorm,
                 TextureUsageFlags.ColorTarget | TextureUsageFlags.ComputeStorageRead
                 );
 
             ResizeTexture(
-                ref TexelIDTexture, 
-                TextureFormat.R32_UInt, 
-                TextureUsageFlags.ColorTarget | TextureUsageFlags.ComputeStorageRead, 
-                depthStencilProps
+                ref SpecularTexture, 
+                TextureFormat.R8G8B8A8_UNorm, 
+                TextureUsageFlags.ColorTarget | TextureUsageFlags.ComputeStorageRead
                 );
         }
 
@@ -122,9 +122,9 @@ internal class RenderTargetManager
             StoreOp = StoreOp.Store,
         }; 
         
-        ColorTargetInfo texCoordTarget = new()
+        ColorTargetInfo albedoTarget = new()
         {
-            Texture = TexCoordTexture,
+            Texture = AlbedoTexture,
 
             ClearColor = new(0, 0, 0, 0),
             LoadOp = LoadOp.Clear,
@@ -140,9 +140,9 @@ internal class RenderTargetManager
             StoreOp = StoreOp.Store,
         };
 
-        ColorTargetInfo texelIDTarget = new()
+        ColorTargetInfo specularTarget = new()
         {
-            Texture = TexelIDTexture,
+            Texture = SpecularTexture,
 
             ClearColor = new(0, 0, 0, 0),
             LoadOp = LoadOp.Clear,
@@ -162,7 +162,7 @@ internal class RenderTargetManager
             StencilStoreOp = StoreOp.Store
         };
 
-        RenderPass pass = commandBuffer.BeginRenderPass([swapchainTarget, texCoordTarget, normalTarget, texelIDTarget], depthTarget);
+        RenderPass pass = commandBuffer.BeginRenderPass([swapchainTarget, albedoTarget, normalTarget, specularTarget], depthTarget);
         pass.End();
 
     }

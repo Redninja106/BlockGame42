@@ -1,6 +1,6 @@
-#include "sdl.slang"
 #include "random.slang"
-#include "hash.slang"
+#include "sdl.slang"
+#include "util.slang"
 
 struct FsIn
 {
@@ -8,14 +8,14 @@ struct FsIn
     float3 worldPosition : TEXCOORD0;
     float4 textureCoordinates : TEXCOORD1;
     float3 normal : TEXCOORD2;
-    int baseFaceID : TEXCOORD3;
 };
 
 struct FsOut
 {
     float4 position : SV_Target0;
-    float4 texCoord : SV_Target1;
+    float4 albedo : SV_Target1;
     float4 normal : SV_Target2;
+    float4 specular : SV_Target3;
 };
 
 SDL_FS_SAMPLER(0, SamplerState sampler);
@@ -26,20 +26,6 @@ SDL_FS_RESOURCE(1, Texture2DArray<float4> normalTextureArray);
 SDL_FS_RESOURCE(2, Texture2DArray<float4> specularTextureArray);
 
 SDL_FS_UNIFORM_BUFFER(0, float3 cameraPosition);
-
-float linearize_depth(float d, float zNear = 0.1, float zFar = 1000)
-{
-    return zNear * zFar / (zFar + d * (zNear - zFar));
-}
-
-float getres(float d)
-{
-    if (d < 16) return 16;
-    if (d < 32) return 8;
-    if (d < 128) return 4;
-    if (d < 256) return 2;
-    return 1;
-}
 
 float3 ParallaxMapping(float3 texCoords, float3 viewDir, out float ao)
 {
@@ -67,14 +53,6 @@ float3 ParallaxMapping(float3 texCoords, float3 viewDir, out float ao)
     return texCoords + float3(p.xy, 0);
 }
 
-float3x3 calc_face_tbn_matrix(float3 hitNormal)
-{
-    int3 n = sign(hitNormal);
-    float3 tangent = select(n.x != 0, n.x * float3(0, 0, 1), float3(1, 0, 0) * select(n.y != 0, n.y, -n.z));
-    float3 bitangent = select(n.y != 0, n.y * float3(0, 0, 1), float3(0, 1, 0));
-    return float3x3(tangent, bitangent, hitNormal);
-}
-
 [shader("fragment")]
 FsOut main(FsIn i)
 {
@@ -82,12 +60,29 @@ FsOut main(FsIn i)
 
     float3x3 tbn = calc_face_tbn_matrix(i.normal);
 
-    o.position = float4(i.worldPosition, 0);
-    o.normal = float4(i.normal, 0);
+    // pack original normal into position.w
+    float pos_w = asfloat((int)packSnorm4x8(float4(i.normal, 0)));
+    o.position = float4(i.worldPosition, pos_w);
 
-    float ao;
-    float3 parallax = ParallaxMapping(i.textureCoordinates.xyz, normalize(mul(tbn, i.worldPosition) - mul(tbn, cameraPosition)), ao);
-    o.texCoord = float4(parallax, ao);
+    float parallax_ao = 1.0;
+    float3 tangent_world_position = mul(tbn, i.worldPosition);
+    float3 tangent_camera_position = mul(tbn, cameraPosition);
+    float3 tangent_view_dir = normalize(tangent_world_position - tangent_camera_position);
+    float3 parallax_uv = ParallaxMapping(i.textureCoordinates.xyz, tangent_view_dir, parallax_ao);
+    
+    o.specular = specularTextureArray.Sample(sampler, parallax_uv);
+    o.albedo = albedoTextureArray.Sample(sampler, parallax_uv);
+
+    float4 encoded_normal = normalTextureArray.Sample(sampler, parallax_uv);
+    float3 normal = decode_normal(encoded_normal.xy);
+    normal = normalize(mul(normal, tbn));
+    normal = i.normal;
+
+    o.normal = float4(
+        encode_normal(normal),
+        encoded_normal.z * parallax_ao, // include parallax AO here
+        encoded_normal.w
+    );
 
     return o;
 }

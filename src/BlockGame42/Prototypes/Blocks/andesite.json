@@ -1,0 +1,13 @@
+{
+  "Prototype": "SolidBlock",
+  "Name": "andesite",
+  "Model": {
+    "Prototype": "SolidBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "andesite",
+      "Normal": "andesite_n",
+      "Specular": "andesite_s"
+    }
+  }
+}

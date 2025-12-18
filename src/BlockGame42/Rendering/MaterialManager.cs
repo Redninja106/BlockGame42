@@ -21,9 +21,14 @@ internal class MaterialManager
     private uint nextId = 1;
     public uint Empty { get; private set; }
 
+    private uint textureWidth, textureHeight;
+
     public MaterialManager(GraphicsContext graphics, uint textureWidth, uint textureHeight)
     {
         this.graphics = graphics;
+
+        this.textureWidth = textureWidth;
+        this.textureHeight = textureHeight;
 
         AlbedoTextureArray = graphics.device.CreateTexture(new() 
         {
@@ -127,14 +132,14 @@ internal class MaterialManager
         {
             TransferBuffer = transferBuffer,
             Offset = 0,
-            PixelsPerRow = (uint)data.Width,
-            RowsPerLayer = (uint)data.Height,
+            PixelsPerRow = (uint)textureWidth,
+            RowsPerLayer = (uint)textureHeight,
         };
         TextureRegion destination = new()
         {
             Texture = target,
-            W = (uint)data.Width,
-            H = (uint)data.Height,
+            W = (uint)textureWidth,
+            H = (uint)textureHeight,
             D = 1,
             Layer = index,
         };

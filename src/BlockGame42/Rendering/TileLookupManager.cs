@@ -93,7 +93,10 @@ internal class TileLookupManager
             // clear the new phase for rendering
             ClearPhase(CurrentPhase);
         }
+    }
 
+    public void ClearReflections()
+    {
         graphics.ClearDataBufferRange(tileReflections, 0, tileReflections.Size, false);
     }
 }

@@ -1,0 +1,13 @@
+{
+  "Prototype": "SolidBlock",
+  "Name": "grass_block",
+  "Model": {
+    "Prototype": "SolidBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "grass_block_top",
+      "Normal": "grass_block_top_n",
+      "Specular": "grass_block_top_s"
+    }
+  }
+}

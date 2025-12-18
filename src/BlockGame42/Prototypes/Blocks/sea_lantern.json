@@ -1,0 +1,13 @@
+{
+  "Prototype": "SolidBlock",
+  "Name": "sea_lantern",
+  "Model": {
+    "Prototype": "SolidBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "sea_lantern",
+      "Normal": "sea_lantern_n",
+      "Specular": "sea_lantern_s"
+    }
+  }
+}

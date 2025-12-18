@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace BlockGame42;
-internal struct Transform
+internal struct Transform : IEquatable<Transform>
 {
     public Vector3 Position = Vector3.Zero;
     public Quaternion Rotation = Quaternion.Identity;
@@ -37,5 +37,23 @@ internal struct Transform
             Rotation = Quaternion.Slerp(a.Rotation, b.Rotation, t)
         };
 
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return obj is Transform transform && this.Equals(transform);
+               
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(Position, Rotation, Forward);
+    }
+
+    public bool Equals(Transform transform)
+    {
+        return Position.Equals(transform.Position) &&
+            Rotation.Equals(transform.Rotation) &&
+            Forward.Equals(transform.Forward);
     }
 }

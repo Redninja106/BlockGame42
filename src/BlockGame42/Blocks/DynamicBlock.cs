@@ -13,6 +13,8 @@ internal class DynamicBlock : Block
     public override BlockPlacementHandler PlacementHandler => BlockPlacementHandler.Dynamic;
     // public override BlockModel Model { get; }
 
+    public override BlockState DefaultState => new BlockState { DynamicBlock = new(0xFF) };
+
     public DynamicBlock() : base()
     {
         // Model = new DynamicBlockModel(Material.CreateUniform(Game.Textures.Get(texid), Game.Textures.Empty));

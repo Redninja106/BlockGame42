@@ -1,0 +1,13 @@
+{
+  "Prototype": "SolidBlock",
+  "Name": "mossy_cobblestone",
+  "Model": {
+    "Prototype": "SolidBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "mossy_cobblestone",
+      "Normal": "mossy_cobblestone_n",
+      "Specular": "mossy_cobblestone_s"
+    }
+  }
+}

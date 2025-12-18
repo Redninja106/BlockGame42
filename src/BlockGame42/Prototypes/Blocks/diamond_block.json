@@ -1,0 +1,13 @@
+{
+  "Prototype": "SolidBlock",
+  "Name": "diamond_block",
+  "Model": {
+    "Prototype": "SolidBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "diamond_block",
+      "Normal": "diamond_block_n",
+      "Specular": "diamond_block_s"
+    }
+  }
+}

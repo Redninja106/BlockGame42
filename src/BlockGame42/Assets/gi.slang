@@ -3,6 +3,8 @@
 #include "hash.slang"
 #include "util.slang"
 
+#define COUNT_RAY_STEPS 1
+
 struct MaterialData
 {
     int transmissions[6];
@@ -26,9 +28,12 @@ SDL_CS_RESOURCE(3, Texture2D<float4> positionTarget);
 SDL_CS_RESOURCE(4, Texture2D<float4> albedoTarget);
 SDL_CS_RESOURCE(5, Texture2D<float4> normalTarget);
 SDL_CS_RESOURCE(6, Texture2D<float4> specularTarget);
+// SDL_CS_RESOURCE(3, Texture2D<float4> prevPositionTarget);
 
 SDL_CS_RESOURCE(7, Texture3D<uint2> blockMasks);
 SDL_CS_RESOURCE(8, Texture3D<uint> materialIds);
+
+// SDL_CS_RESOURCE(9, StructuredBuffer<uint4> prevTileReflections);
 
 // SDL_CS_RESOURCE(8, StructuredBuffer<MaterialData> materials)
 
@@ -46,7 +51,11 @@ struct Uniforms
 SDL_CS_UNIFORM_BUFFER(0, Uniforms uniforms);
 
 static Random random;
+static uint haltonIndex;
 
+#if COUNT_RAY_STEPS
+static uint ray_step_count = 0;
+#endif
 
 [shader("compute")]
 [numthreads(16, 16, 1)]
@@ -55,6 +64,7 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     float4 pos_and_norm = positionTarget[dispatchThreadID.xy];
     float4 encoded_normal = normalTarget[dispatchThreadID.xy];
     float4 specular = specularTarget[dispatchThreadID.xy];
+    // float4 prev_pos = prevPositionTarget[dispatchThreadID.xy];
     // float4 albedo = specularTarget[dispatchThreadID.xy];
 
     float3 position = pos_and_norm.xyz;
@@ -66,27 +76,12 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
                   (dispatchThreadID.x + 0x8523) * 0xb7e35a7d + 
                   (dispatchThreadID.y + 0x7423) * 0x3f05aa5f;
     random.Next();
+    
+    // haltonIndex = dispatchThreadID.x + 
+    //               dispatchThreadID.y + 
+    //               uniforms.ticks;
 
     const int samples = 4;
-
-    // const float3 reflectiveness = 1;
-    // float3 reflection_color = 0;
-    // float3 reflect_dir = reflect(normalize(uniforms.cameraPosition.xyz - position), normal);
-    // Ray reflect_ray = Ray(position, reflect_dir, 1 / reflect_dir, 64);
-    // 
-    // float hitT;
-    // float3 hitNormal;
-    // int3 hitVoxel;
-    // if (dda(reflect_ray, hitT, hitNormal, hitVoxel))
-    // {
-    //     MaterialData material = materials[materialIds[hitVoxel + uniforms.blockMasksOffset]];
-    //     float2 uv = calc_face_uv(reflect_ray.at(hitT), hitNormal);
-    //     reflection_color = materialTextures[material.transmissions[0]].xyz;
-    // }
-    // else 
-    // {
-    //     reflection_color = .25;
-    // }
 
     float3 totalColor = float3(0);
     for (int i = 0; i < samples; i++)
@@ -100,26 +95,16 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
         totalColor += ray_color(sample_ray, normal);
     }
     totalColor *= (1.0 / samples);
-    // totalColor = (1 - reflectiveness) * totalColor + reflectiveness * reflection_color;
-    //totalColor = original_normal * .5 + .5;
 
-    uint idx = find_or_insert(position, original_normal, hash_detail(position, uniforms.cameraPosition.xyz));
+    uint detail = hash_detail(position, uniforms.cameraPosition.xyz);
+    uint idx = find_or_insert(position, original_normal, detail);
     InterlockedAdd(tileIrradiances[idx].r, int(255 * totalColor.r));
     InterlockedAdd(tileIrradiances[idx].g, int(255 * totalColor.g));
     InterlockedAdd(tileIrradiances[idx].b, int(255 * totalColor.b));
     InterlockedAdd(tileIrradiances[idx].a, 1);
 
-    // MaterialData material = materials[materialIds[(int3)floor(position) + uniforms.blockMasksOffset]];
-    // float2 uv = calc_face_uv(frac(position), normal);
-
-    // float4 sampledNormal = normalTextureArray.SampleLevel(sampler, texCoord.xyz, 0);
-    // float4 specular = specularTextureArray.SampleLevel(sampler, texCoord.xyz, 0);
-
     float reflection = specular.g <= 229 ? specular.g : 0;
-
-    // float reflection = albedoTextureArray.SampleLevel(sampler, texCoord.xyw, 0).w;
-
-    if (reflection > 0)
+    if (reflection > 0.1)
     {
         const int reflect_ray_count = 1;
 
@@ -136,11 +121,43 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
 
             reflect_color = reflection_color(reflection_ray);
         }
+
+        // float3 motion = position - prev_pos.xyz;
+        // float prev_idx = find(0, position - motion * .5, original_normal, detail);
+
         InterlockedAdd(tileReflections[idx - uniforms.tileOffset].r, int(255 * reflect_color.r));
         InterlockedAdd(tileReflections[idx - uniforms.tileOffset].g, int(255 * reflect_color.g));
         InterlockedAdd(tileReflections[idx - uniforms.tileOffset].b, int(255 * reflect_color.b));
         InterlockedAdd(tileReflections[idx - uniforms.tileOffset].a, reflect_ray_count);
     }
+}
+
+static const float3 TURBO[16] = {
+    float3(0.18995, 0.07176, 0.23217),
+    float3(0.25107, 0.25237, 0.63374),
+    float3(0.27628, 0.42118, 0.89123),
+    float3(0.25862, 0.57230, 0.97711),
+    float3(0.21603, 0.70670, 0.90068),
+    float3(0.17895, 0.82095, 0.74684),
+    float3(0.27059, 0.90909, 0.51912),
+    float3(0.46920, 0.96773, 0.32103),
+    float3(0.67579, 0.98821, 0.21008),
+    float3(0.85144, 0.94188, 0.18409),
+    float3(0.96359, 0.84317, 0.23270),
+    float3(0.99675, 0.70259, 0.34699),
+    float3(0.95547, 0.53393, 0.47156),
+    float3(0.85907, 0.35018, 0.58910),
+    float3(0.72161, 0.19110, 0.63536),
+    float3(0.47960, 0.01583, 0.57066)
+}; 
+
+float3 SampleTurbo(float t)
+{
+    t = saturate(t);
+    float x = t * 15.0;
+    int i = (int)x;
+    float f = frac(x);
+    return lerp(TURBO[i], TURBO[min(i + 1, 15)], f);
 }
 
 uint find_or_insert(float3 position, float3 normal, float detail)
@@ -174,6 +191,7 @@ float3 ray_color(Ray ray, float3 normal)
     float3 hitNormal;
     int3 hitVoxel;
 
+    float3 sky_light = 0;
     float3 albedo[MaxBounces];
     float4 specular[MaxBounces];
     for (int i = 0; i < MaxBounces; i++)
@@ -181,6 +199,7 @@ float3 ray_color(Ray ray, float3 normal)
         albedo[i] = 0;
         specular[i] = 0;
     }
+
 
     for (int i = 0; i < MaxBounces; i++)
     {
@@ -212,8 +231,7 @@ float3 ray_color(Ray ray, float3 normal)
             const float skystrength = .1;
 
             // sky emission
-            specular[i].w += skystrength; // + 0.5 * float3(.392f, .584f, .929f);
-            albedo[i] = float3(1);
+            sky_light += skystrength; // + 0.5 * float3(.392f, .584f, .929f);
             break;
         }
     }
@@ -231,8 +249,10 @@ float3 ray_color(Ray ray, float3 normal)
     if (!dda(sunRay, hitT, hitNormal, hitVoxel))
     {
         float sunbrightness = dot(sunRay.direction, normal) * dot(sunRay.direction, normalize(uniforms.sundir.xyz));
-        //specular[0].w += sunstrength * max(0, sunbrightness);
+        sky_light += sunstrength * max(0, sunbrightness);
     }
+
+    constexpr float emissionStrength = 2;
 
     float3 color = float3(0, 0, 0);
     for (int j = MaxBounces - 1; j >= 0; j--)
@@ -243,9 +263,9 @@ float3 ray_color(Ray ray, float3 normal)
             emission = 0;
         }
 
-        color = albedo[j] * (color + emission);
+        color = albedo[j] * (color + emission * emissionStrength);
     }
-    return color;
+    return color + sky_light;
 }
 
 float3 reflection_color(Ray ray)
@@ -400,163 +420,6 @@ struct Ray
     }
 };
 
-static const Box boxes[] = 
-{
-    Box(float3(0.0f, 0.0f, 0.0f), float3(0.5f, 0.5f, 0.5f)),
-    Box(float3(0.5f, 0.0f, 0.0f), float3(1.0f, 0.5f, 0.5f)),
-    Box(float3(0.0f, 0.0f, 0.5f), float3(0.5f, 0.5f, 1.0f)),
-    Box(float3(0.5f, 0.0f, 0.5f), float3(1.0f, 0.5f, 1.0f)),
-    Box(float3(0.0f, 0.5f, 0.0f), float3(0.5f, 1.0f, 0.5f)),
-    Box(float3(0.5f, 0.5f, 0.0f), float3(1.0f, 1.0f, 0.5f)),
-    Box(float3(0.0f, 0.5f, 0.5f), float3(0.5f, 1.0f, 1.0f)),
-    Box(float3(0.5f, 0.5f, 0.5f), float3(1.0f, 1.0f, 1.0f)),
-};
-
-bool BoxRaycast(Box box, Ray ray, out float t, out float3 normal)
-{
-    float t1 = (box.min.x - ray.origin.x) * ray.inverseDirection.x;
-    float t2 = (box.max.x - ray.origin.x) * ray.inverseDirection.x;
-    float t3 = (box.min.y - ray.origin.y) * ray.inverseDirection.y;
-    float t4 = (box.max.y - ray.origin.y) * ray.inverseDirection.y;
-    float t5 = (box.min.z - ray.origin.z) * ray.inverseDirection.z;
-    float t6 = (box.max.z - ray.origin.z) * ray.inverseDirection.z;
-
-    float tNear = max(max(min(t1, t2), min(t3, t4)), min(t5, t6));
-    float tFar = min(min(max(t1, t2), max(t3, t4)), max(t5, t6));
-
-    if (tNear <= tFar && tFar > 0 && tNear < ray.length)
-    {
-        t = tNear < 0 ? tFar : tNear;
-        normal = 0;
-
-        // if (t == t1)
-        //     normal = float3(-1, 0, 0);
-        // else if (t == t2)
-        //     normal = float3(1, 0, 0);
-        // else if (t == t3)
-        //     normal = float3(0, -1, 0);
-        // else if (t == t4)
-        //     normal = float3(0, 1, 0);
-        // else if (t == t5)
-        //     normal = float3(0, 0, -1);
-        // else if (t == t6)
-        //     normal = float3(0, 0, 1);
-        // else
-        //     normal = float3(0, 0, 0); // huh?
-
-        return true;
-    }
-
-    return false;
-}
-
-// bool raycast(Ray ray, out float t, out float3 normal, out int3 voxel)
-// {
-//     voxel = int3(floor(ray.origin)) + uniforms. blockMasksOffset;
-//     int3 step = int3(sign(ray.direction));
-// 
-//     if (all(step == 0))
-//     {
-//         t = 0;
-//         normal = 0;
-//         voxel = 0;
-//         return false;
-//     }
-// 
-//     float3 start = ray.at(0);
-//     float3 end = ray.at(ray.length);
-// 
-//     float3 d = end - start;
-//     float3 tDelta = ray.inverseDirection;
-//     float3 tMax = tDelta * select(step > 0, 1 - frac(start), frac(start));
-// 
-//     bool3 voxelIncr = false;
-//     int steps = 50;
-//     while (bool(--steps))
-//     {
-//         uint2 block_mask = blockMasks.Load(int4(voxel, 0));
-//         uint64_t mask = block_mask.x << 32 | block_mask.y;
-// 
-//         if (mask == 0xFF)
-//         {
-//            tMax -= float3(voxelIncr) * tDelta;
-//            t = min3(tMax.x, tMax.y, tMax.z);
-//            normal = voxelIncr * -step;
-//            voxel -= uniforms.blockMasksOffset;
-//            return true;
-//         }
-//         else if (byte != 0)
-//         {
-//            // int3 mask = (ray.at(t) - voxel) > .5;
-//            // int bitIdx = mask.x << 2 | mask.y << 1 | mask.z << 0;
-//
-//            bool hit = false;
-//            Ray localRay = ray;
-//            localRay.origin -= voxel - uniforms.blockMasksOffset;
-//            for (int i = 0; i < 8; i++)
-//            {
-//                if (((byte >> i) & 1) == 1)
-//                {
-//                    float boxT;
-//                    float3 boxNormal;
-//                    if (BoxRaycast(boxes[i], localRay, boxT, boxNormal))
-//                    {
-//                        if (boxT > 0 && boxT <= t)
-//                        {
-//                            hit = true;
-//                            t = boxT;
-//                            normal = boxNormal;
-//                        }
-//                    }
-//                }
-//            }
-//
-//            if (hit)
-//            {
-//                voxel -= uniforms.blockMasksOffset;
-//                return true;
-//            }
-//         }
-//         
-//         voxelIncr = tMax.xyz <= tMax.yxx && tMax.xyz <= tMax.zzy;
-//         tMax = float3(voxelIncr) * tDelta + tMax;
-//         voxel = voxelIncr * step + voxel;
-// 
-//         // if (step.x != 0 && tMax.x < tMax.y)
-//         // {
-//         //     if (step.x != 0 && tMax.x < tMax.z)
-//         //     {
-//         //         voxel.x += step.x;
-//         //         tMax.x += tDelta.x;
-//         //         normal = float3(-step.x, 0, 0);
-//         //     }
-//         //     else
-//         //     {
-//         //         voxel.z += step.z;
-//         //         tMax.z += tDelta.z;
-//         //         normal = float3(0, 0, -step.z);
-//         //     }
-//         // }
-//         // else
-//         // {
-//         //     if (step.y != 0 && tMax.y < tMax.z)
-//         //     {
-//         //         voxel.y += step.y;
-//         //         tMax.y += tDelta.y;
-//         //         normal = float3(0, -step.y, 0);
-//         //     }
-//         //     else
-//         //     {
-//         //         voxel.z += step.z;
-//         //         tMax.z += tDelta.z;
-//         //         normal = float3(0, 0, -step.z);
-//         //     }
-//         // }
-//     }
-// 
-//     return false;
-// }
-
 uint64_t get_ray_mask(Ray ray, float t_entrance, float3 t_delta, int3 step)
 {
     float3 pos = ray.at(t_entrance);
@@ -629,6 +492,11 @@ bool dda(Ray ray, out float outT, out float3 outNormal, out int3 outVoxel)
     for (int i = 0; i < 64; i++)
     {
         uint64_t mask = __asuint64(blockMasks[voxel + uniforms.blockMasksOffset]);
+
+#if COUNT_RAY_STEPS
+        ray_step_count++;
+#endif
+        
         if (mask != 0)
         {
             float3 prev_t_3 = t - float3(voxelIncr) * delta_t;
@@ -643,10 +511,6 @@ bool dda(Ray ray, out float outT, out float3 outNormal, out int3 outVoxel)
             }
             else if (hit_ray_mask(ray, mask, voxel, select(all(voxelIncr == 0), 0, prev_t), delta_t, step, outT, outNormal))
             {
-                if (all(outNormal == 0))
-                {
-                    outNormal = voxelIncr * -step;
-                }
                 outVoxel = voxel;
                 return true;
             }
@@ -660,119 +524,46 @@ bool dda(Ray ray, out float outT, out float3 outNormal, out int3 outVoxel)
     return false;
 }
 
-// // https://www.researchgate.net/publication/233899848_Efficient_implementation_of_the_3D-DDA_ray_traversal_algorithm_on_GPU_and_its_application_in_radiation_dose_calculation
-// 
-// bool raycast_dda_lod(Ray ray, out float outT, out float3 outNormal, out int3 outVoxel)
-// {
-//     // convert ray to half-block space
-//     ray.origin *= 2;
-//     int3 voxel = int3(floor(ray.origin));
-//     int3 step = int3(sign(ray.direction));
-// 
-//     if (all(step == 0))
-//     {
-//         return false;
-//     }
-// 
-//     float3 start = ray.at(0);
-//     float3 end = ray.at(ray.length);
-//     float3 tDelta = step / (end - start);
-//     float3 t = tDelta * float3(
-// 		step.x > 0 ? 1 - frac(start.x) : frac(start.x),
-// 		step.y > 0 ? 1 - frac(start.y) : frac(start.y),
-//         step.z > 0 ? 1 - frac(start.z) : frac(start.z)
-//     );
-// 
-//     constexpr int maxlod = 1;
-//     int lod = 0;
-//     float lodScale = pow(2, lod);
-// 
-//     int mask = 0;
-//     bool3 voxelIncr = bool3(false);
-//     while (all(voxel >= 0) && all(voxel < 0))
-//     {
-//         if (lod < 0)
-//         {
-//             outT = max3(t.x, t.y, t.z);
-//             outNormal = -step * voxelIncr;
-//             return true;
-//         }
-//         
-//         mask = blockMasks.Load(int4(voxel >> 1, max(lod - 1, 0)));
-// 
-//         if (mask == 0)
-//         {
-//             if (lod < maxlod) 
-//             {
-//                 lod++;
-//                 lodScale = pow(2, lod);
-//             }
-//         }
-//         else // if (mask == 0xFF)
-//         {
-//             lod--;
-//             lodScale = pow(2, lod);
-//             continue;
-//         }
-//         // else
-//         // {
-//         //     int3 localVoxel = (voxel >> lod) & int3(1, 1, 1);
-//         //     int bit = localVoxel.x * 4 + localVoxel.y * 2 + localVoxel.z;
-//         //     if ((mask >> bit) != 0)
-//         //     {
-//         //         lod--;
-//         //         lodScale = pow(2, lod);
-//         //         continue;
-//         //     }
-//         // }
-// 
-//         voxelIncr = t.xyz <= t.yxx && t.xyz <= t.zzy;
-//         t = float3(voxelIncr) * tDelta + t;
-//         voxel = voxelIncr * step + voxel;
-//     }
-// 
-//     return false;
-// }
-// 
-// bool raycast_dda(Ray ray, out float outT, out float3 outNormal, out int3 outVoxel)
-// {
-//     int3 voxel = int3(floor(ray.origin));
-//     int3 step = int3(sign(ray.direction));
-// 
-//     if (all(step == 0))
-//     {
-//         return false;
-//     }
-// 
-//     float3 start = ray.at(0);
-//     float3 end = ray.at(ray.length);
-//     float3 tDelta = step / (end - start);
-//     float3 t = tDelta * float3(
-// 		step.x > 0 ? 1 - frac(start.x) : frac(start.x),
-// 		step.y > 0 ? 1 - frac(start.y) : frac(start.y),
-//         step.z > 0 ? 1 - frac(start.z) : frac(start.z)
-//     );
-// 
-//     constexpr int3 blockMasksSize = 2 * int3(128, 64, 128);
-// 
-//     int mask = 0;
-//     bool3 voxelIncr = bool3(false);
-//     while (all(voxel >= 0) && all(voxel < blockMasksSize))
-//     {
-//         mask = blockMasks.Load(int4(voxel, 0));
-// 
-//         voxelIncr = t.xyz <= t.yxx && t.xyz <= t.zzy;
-//         t = float3(voxelIncr) * tDelta + t;
-//         voxel = voxelIncr * step + voxel;
-// 
-//         if (mask != 0)
-//         {
-//             outT = fmax3(t.x, t.y, t.z);
-//             outVoxel = voxel;
-//             outNormal = -step * voxelIncr;
-//             return true;
-//         }
-//     }
-// 
-//     return false;
-// }
+bool dda_lod(Ray ray, out float outT, out float3 outNormal, out int3 outVoxel)
+{
+    if (all(ray.direction == 0))
+    {
+        return false;
+    }
+
+    int3 step = sign(ray.direction);
+    float3 delta_t = abs(ray.inverseDirection);
+    float3 t = delta_t * select(ray.direction > 0, 1 - frac(ray.origin), frac(ray.origin));
+    int3 voxel = int3(floor(ray.origin));
+
+    int lod = 0;
+    bool3 voxelIncr = false;
+    for (int i = 0; i < 64; i++)
+    {
+        uint64_t mask = __asuint64(blockMasks[voxel + uniforms.blockMasksOffset]);
+        if (mask != 0)
+        {
+            float3 prev_t_3 = t - float3(voxelIncr) * delta_t;
+            float prev_t = min3(prev_t_3.x, prev_t_3.y, prev_t_3.z);
+
+            if (mask == uint64_t::maxValue)
+            {
+                outT = prev_t;
+                outNormal = voxelIncr * -step;
+                outVoxel = voxel;
+                return true;
+            }
+            else if (hit_ray_mask(ray, mask, voxel, select(all(voxelIncr == 0), 0, prev_t), delta_t, step, outT, outNormal))
+            {
+                outVoxel = voxel;
+                return true;
+            }
+        }
+
+        voxelIncr = t.xyz <= t.yxx && t.xyz <= t.zzy;
+        t = float3(voxelIncr) * delta_t + t;
+        voxel = voxelIncr * step + voxel;
+    }
+
+    return false;
+}

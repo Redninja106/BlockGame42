@@ -15,6 +15,8 @@ abstract class Block : Prototype
     public abstract BlockPlacementHandler PlacementHandler { get; }
     public BlockModel Model { get; set; }
 
+    public virtual BlockState DefaultState { get; } = default;
+
     public Item Item { get; }
 
     public BlockStrength Strength { get; init; }

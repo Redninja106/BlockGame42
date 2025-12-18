@@ -1,0 +1,13 @@
+{
+  "Prototype": "SolidBlock",
+  "Name": "glass",
+  "Model": {
+    "Prototype": "SolidBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "glass",
+      "Normal": "glass_n",
+      "Specular": "glass_s"
+    }
+  }
+}

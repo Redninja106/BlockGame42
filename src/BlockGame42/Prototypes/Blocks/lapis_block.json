@@ -1,0 +1,13 @@
+{
+  "Prototype": "SolidBlock",
+  "Name": "lapis_block",
+  "Model": {
+    "Prototype": "SolidBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "lapis_block",
+      "Normal": "lapis_block_n",
+      "Specular": "lapis_block_s"
+    }
+  }
+}

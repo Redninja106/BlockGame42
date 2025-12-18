@@ -1,0 +1,13 @@
+{
+  "Prototype": "SolidBlock",
+  "Name": "redstone_block",
+  "Model": {
+    "Prototype": "SolidBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "redstone_block",
+      "Normal": "redstone_block_n",
+      "Specular": "redstone_block_s"
+    }
+  }
+}

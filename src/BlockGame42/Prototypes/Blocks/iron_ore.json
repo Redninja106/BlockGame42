@@ -1,0 +1,13 @@
+{
+  "Prototype": "SolidBlock",
+  "Name": "iron_ore",
+  "Model": {
+    "Prototype": "SolidBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "iron_ore",
+      "Normal": "iron_ore_n",
+      "Specular": "iron_ore_s"
+    }
+  }
+}

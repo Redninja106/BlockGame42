@@ -15,7 +15,6 @@ internal class ChunkRenderer
     private readonly GraphicsContext graphics;
     private readonly GraphicsPipeline chunkPipeline;
     private readonly Sampler sampler;
-    private readonly TransferBuffer blockMaskVolumeTransferBuffer;
     private readonly BlockMaskManager blockMaskManager;
     private readonly TileLookupManager tileLookupManager;
 
@@ -63,42 +62,6 @@ internal class ChunkRenderer
             DepthStencilState = new DepthStencilState(CompareOp.Less, default, default, 0, 0, true, true, false),
         });
 
-        //depthOnlyChunkPipeline = graphics.device.CreateGraphicsPipeline(new()
-        //{
-        //    VertexShader = graphics.shaders.Get("chunk_vs"),
-        //    FragmentShader = graphics.shaders.Get("chunk_depth_fs"),
-        //    TargetInfo = new GraphicsPipelineTargetInfo(
-        //        [],
-        //        TextureFormat.D24_UNorm_S8_UInt,
-        //        true
-        //        ),
-        //    PrimitiveType = PrimitiveType.TriangleList,
-        //    VertexInputState = new VertexInputState([
-        //        new VertexBufferDescription(0, MinimizedChunkVertex.Size, VertexInputRate.Vertex, 0)
-        //        ], MinimizedChunkVertex.Attributes),
-        //    RasterizerState = new RasterizerState(FillMode.Fill, CullMode.Back, FrontFace.CounterClockwise, 0, 0, 0, false, true),
-        //    MultisampleState = new MultisampleState(SampleCount._1, 0, false, false),
-        //    DepthStencilState = new DepthStencilState(CompareOp.Less, default, default, 0, 0, true, true, false),
-        //});
-
-
-
-        //graphics.device.CreateTexture(new()
-        //{
-        //    Format = TextureFormat.R8G8B8A8_UNorm,
-        //    Height = 1024,
-        //    Width = 1024,
-        //    LayerCountOrDepth = 10,
-        //    NumLevels = 0,
-        //    Usage = TextureUsageFlags.ComputeStorageSimultaneousReadWrite,
-        //});
-        // blockMaskVolumeBuffer = graphics.device.CreateDataBuffer(DataBufferUsageFlags.GraphicsStorageRead, 128 * 128 * 64);
-
-        // blockMaskVolumeTransferBuffer = graphics.device.CreateTransferBuffer(TransferBufferUsage.Upload, Chunk.Width * Chunk.Height * Chunk.Depth);
-
-
-        // blockTextures = new(graphics);
-
         sampler = graphics.device.CreateSampler(new()
         {
             MipmapMode = SamplerMipmapMode.Linear,
@@ -125,8 +88,6 @@ internal class ChunkRenderer
         });
 
         tileLookupManager = new TileLookupManager(graphics, 10, 5_000_000, 10);
-
-        // tileLookup = graphics.device.CreateDataBuffer(DataBufferUsageFlags.ComputeStorageRead | DataBufferUsageFlags.ComputeStorageWrite, (uint)Unsafe.SizeOf<TileRecord>() * 10_000_000);
     }
 
     struct Uniforms
@@ -339,7 +300,15 @@ internal class ChunkRenderer
         tileRenderPass.End();
 
         tileLookupManager.PhaseTick();
+
+        if (camera.transform.Position != lastCameraTransform.Position)
+        {
+            tileLookupManager.ClearReflections();
+            lastCameraTransform = camera.transform;
+        }
     }
+
+    Transform lastCameraTransform;
 
     struct TileRenderUniforms
     {

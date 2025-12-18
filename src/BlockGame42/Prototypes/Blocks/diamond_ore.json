@@ -1,0 +1,13 @@
+{
+  "Prototype": "SolidBlock",
+  "Name": "diamond_ore",
+  "Model": {
+    "Prototype": "SolidBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "diamond_ore",
+      "Normal": "diamond_ore_n",
+      "Specular": "diamond_ore_s"
+    }
+  }
+}

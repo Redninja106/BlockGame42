@@ -1,0 +1,13 @@
+{
+  "Prototype": "SolidBlock",
+  "Name": "emerald_block",
+  "Model": {
+    "Prototype": "SolidBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "emerald_block",
+      "Normal": "emerald_block_n",
+      "Specular": "emerald_block_s"
+    }
+  }
+}

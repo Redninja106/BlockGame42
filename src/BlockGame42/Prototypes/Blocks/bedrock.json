@@ -1,0 +1,13 @@
+{
+  "Prototype": "SolidBlock",
+  "Name": "bedrock",
+  "Model": {
+    "Prototype": "SolidBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "bedrock",
+      "Normal": "bedrock_n",
+      "Specular": "bedrock_s"
+    }
+  }
+}

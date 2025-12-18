@@ -45,7 +45,7 @@ class GameClient : Application
     public GUIViewport Viewport { get; private set; }
     public GameRenderer Renderer { get; private set; }
     public World World { get; private set; }
-    public ClientChunkManager ChunkManager { get; private set; }
+    public ChunkManager ChunkManager { get; private set; }
 
     protected override void OnInit()
     {
@@ -58,7 +58,7 @@ class GameClient : Application
 
         Interaction = new();
 
-        ChunkManager = new(this);
+        ChunkManager = new JsonChunkManager(this);
 
         Load(assets);
 
@@ -129,7 +129,7 @@ class GameClient : Application
         // blocks = new(context);
         World = new World();
         var player = new PlayerEntity(World);
-        player.Transform.Position = new Vector3(0, 30, 0);
+        player.Transform.Position = new Vector3(0, 62, 0);
         player.Transform.Rotation = Quaternion.Identity;
         
         World.AddEntity(player);
@@ -161,7 +161,7 @@ class GameClient : Application
         Interaction.Player.Update(deltaTime);
         Interaction.Player.Camera.Update(window.Width, window.Height);
 
-        ChunkManager.Update(Interaction.Player);
+        ChunkManager.Update();
 
         TickProgress = accumulatedTickTime / TimeStep;
         World.Update();

@@ -1,0 +1,13 @@
+{
+  "Prototype": "SolidBlock",
+  "Name": "netherite_block",
+  "Model": {
+    "Prototype": "SolidBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "netherite_block",
+      "Normal": "netherite_block_n",
+      "Specular": "netherite_block_s"
+    }
+  }
+}

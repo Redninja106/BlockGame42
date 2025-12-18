@@ -1,0 +1,13 @@
+{
+  "Prototype": "SolidBlock",
+  "Name": "magma_block",
+  "Model": {
+    "Prototype": "SolidBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "magma",
+      "Normal": "magma_n",
+      "Specular": "magma_s"
+    }
+  }
+}

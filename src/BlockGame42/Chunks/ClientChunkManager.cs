@@ -10,18 +10,16 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace BlockGame42.Chunks;
-internal class ClientChunkManager
+internal class ClientChunkManager : ChunkManager
 {
-    private GameClient client;
     private WorldGenerator generator;
 
-    public ClientChunkManager(GameClient client)
+    public ClientChunkManager(GameClient client) : base(client)
     {
-        this.client = client;
         generator = new();
     }
 
-    public void Initialize()
+    public override void Initialize()
     {
     //    int chunks = 2;
 
@@ -39,14 +37,14 @@ internal class ClientChunkManager
 
     public void LoadOrCreateChunk(Coordinates coordinates)
     {
-        if (client.World.Chunks.At(coordinates) != null)
+        if (Client.World.Chunks.At(coordinates) != null)
         {
             return;
         }
 
         Chunk chunk = new Chunk();
-        client.World.Chunks.Insert(coordinates, chunk);
-        generator.GenerateChunk(client.World, coordinates, chunk);
+        Client.World.Chunks.Insert(coordinates, chunk);
+        generator.GenerateChunk(Client.World, coordinates, chunk);
 
         //for (int z = 0; z < Chunk.Depth; z++)
         //{
@@ -99,8 +97,10 @@ internal class ClientChunkManager
 
     }
 
-    public void Update(PlayerEntity player)
+    public override void Update()
     {
+        var player = Client.Interaction.Player;
+
         int chunks = 3;
         Coordinates centerChunk = player.GetChunkCoordinates();
 

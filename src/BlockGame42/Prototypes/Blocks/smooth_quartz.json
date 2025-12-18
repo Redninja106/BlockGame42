@@ -1,0 +1,13 @@
+{
+  "Prototype": "SolidBlock",
+  "Name": "smooth_quartz",
+  "Model": {
+    "Prototype": "SolidBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "quartz_block_bottom",
+      "Normal": "quartz_block_bottom_n",
+      "Specular": "quartz_block_bottom_s"
+    }
+  }
+}

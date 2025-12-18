@@ -51,6 +51,20 @@ public class Registry
         return (TPrototype)Get(name);
     }
 
+    public static bool TryGet<TPrototype>(string name, [NotNullWhen(true)] out TPrototype? prototype) where TPrototype : Prototype
+    {
+        if (prototypes.TryGetValue(name, out Prototype? p))
+        {
+            if (p is TPrototype tproto)
+            {
+                prototype = tproto;
+                return true;
+            }
+        }
+        prototype = null;
+        return false;
+    }
+
     public static TPrototype[] GetAll<TPrototype>() where TPrototype : Prototype
     {
         return [..prototypes.Values.OfType<TPrototype>(), ..anonymousPrototypes.OfType<TPrototype>()];

@@ -1,0 +1,13 @@
+{
+  "Prototype": "SolidBlock",
+  "Name": "gold_block",
+  "Model": {
+    "Prototype": "SolidBlockModel",
+    "Material": {
+      "Prototype": "CombinedBlockMaterial",
+      "Albedo": "gold_block",
+      "Normal": "gold_block_n",
+      "Specular": "gold_block_s"
+    }
+  }
+}

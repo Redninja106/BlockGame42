@@ -17,6 +17,7 @@ internal class ChunkRenderer
     private readonly Sampler sampler;
     private readonly BlockMaskManager blockMaskManager;
     private readonly TileLookupManager tileLookupManager;
+    private int frameCount;
 
     private ComputePipeline giPipeline;
     private GraphicsPipeline tileRenderPipeline;
@@ -26,15 +27,6 @@ internal class ChunkRenderer
     public bool animateSun = true;
 
     private Dictionary<Chunk, ChunkMesh> chunkMeshes = [];
-
-    struct TileRecord
-    {
-        public uint id;
-        public uint accumulatedR;
-        public uint accumulatedG;
-        public uint accumulatedB;
-        public uint accumulatedCount;
-    }
     
     public ChunkRenderer(GraphicsContext graphics)
     {
@@ -94,17 +86,27 @@ internal class ChunkRenderer
     {
         public Vector4 sundir;
         public Vector4 cameraPosition;
+        public Vector4 prevCameraPosition;
         public Coordinates blockMasksOffset;
         public uint tileOffset;
         public uint tileCount;
         public uint phaseCount;
         public uint ticks;
+        public uint frameCount;
+        public uint currentPhase;
+        public uint previousPhase;
     }
 
     public void Render(GameRenderer renderer, Camera camera, World world)
     {
         blockMaskManager.DrawDebugOverlay(renderer);
-        
+     
+        if (frameCount == 0)
+        {
+            tileLookupManager.ClearReflections(0);
+            tileLookupManager.ClearReflections(1);
+        }
+
         foreach (var (coords, chunk) in world.Chunks)
         {
             if (chunk.BlockMasks.Stale)
@@ -235,6 +237,9 @@ internal class ChunkRenderer
         uniforms.phaseCount = tileLookupManager.PhaseCount;
         uniforms.ticks = (uint)Application.GetTicksNS();
         uniforms.sundir = this.sundir;
+        uniforms.frameCount = (uint)this.frameCount;
+        uniforms.currentPhase = tileLookupManager.CurrentPhase;
+        uniforms.previousPhase = lastPhase;
 
         if (animateSun)
         {
@@ -243,6 +248,7 @@ internal class ChunkRenderer
 
         uniforms.blockMasksOffset = Chunk.Size * blockMaskManager.ChunkOffset;
         uniforms.cameraPosition = new(camera.transform.Position, 0);
+        uniforms.prevCameraPosition = new(lastCameraTransform.Position, 0);
         graphics.CommandBuffer.PushComputeUniformData(0, ref uniforms);
 
         giPass.Dispatch((graphics.RenderTargets.Width + 15) / 16, (graphics.RenderTargets.Height + 15) / 16, 1);
@@ -274,6 +280,7 @@ internal class ChunkRenderer
             phaseCount = tileLookupManager.PhaseCount,
             tileCount = tileLookupManager.TilesPerPhase,
             currentPhase = tileLookupManager.CurrentPhase,
+            frameCount = (uint)frameCount,
         };
 
         graphics.CommandBuffer.PushFragmentUniformData(0, ref tileUniforms);
@@ -299,16 +306,17 @@ internal class ChunkRenderer
         tileRenderPass.DrawPrimitives(3, 1, 0, 0);
         tileRenderPass.End();
 
-        tileLookupManager.PhaseTick();
+        lastPhase = tileLookupManager.CurrentPhase;
 
-        if (camera.transform.Position != lastCameraTransform.Position)
-        {
-            tileLookupManager.ClearReflections();
-            lastCameraTransform = camera.transform;
-        }
+        tileLookupManager.PhaseTick();
+        tileLookupManager.ClearReflections((int)(uniforms.frameCount + 1) % 2);
+        lastCameraTransform = camera.transform;
+
+        frameCount++;
     }
 
     Transform lastCameraTransform;
+    uint lastPhase;
 
     struct TileRenderUniforms
     {
@@ -316,6 +324,7 @@ internal class ChunkRenderer
         public uint phaseCount;
         public uint tileCount;
         public uint currentPhase;
+        public uint frameCount;
     }
 
     struct ChunkData

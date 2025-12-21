@@ -32,14 +32,9 @@
 	
 	
 	<ItemGroup>
-	  <ProjectReference Include="..\..\..\SDL\src\SDL\SDL.csproj" />
+	  <ProjectReference Include="..\..\dependencies\SDLdotnet\src\SDLdotnet\SDLdotnet.csproj" />
+	  <ProjectReference Include="..\BlockGame42.Assets.Pipeline\BlockGame42.Assets.Pipeline.csproj" />
 	  <ProjectReference Include="..\Protor\Protor.csproj" />
-	</ItemGroup>
-	
-	<ItemGroup>
-	  <None Update="SDL3.dll">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
 	</ItemGroup>
 	
   <Target Name="PostBuild" BeforeTargets="PostBuildEvent">

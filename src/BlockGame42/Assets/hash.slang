@@ -33,7 +33,7 @@ void get_hash_and_checksum(float3 position, float3 normal, float detail, out uin
 {
     int normal_hash = (int)(normal.x + 51) * 101 + (int)(normal.y + 7) * 17 + (int)(normal.z + 13);
 
-    int3 int_position = (int3)floor(position * detail - normal * .001);
+    int3 int_position = (int3)floor(position * detail + normal * .001);
 
     hash = pcg_hash(int_position.x);
     checksum = wang_hash(int_position.x);

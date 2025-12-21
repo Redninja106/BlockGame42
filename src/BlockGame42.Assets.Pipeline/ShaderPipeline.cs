@@ -11,7 +11,6 @@ using System.Threading.Tasks;
 namespace BlockGame42.Assets.Pipeline;
 internal class ShaderPipeline : AssetPipeline
 {
-    
     public override string PrimaryInputExtension => ".slang";
     public override string PrimaryOutputExtension => ".cso";
 
@@ -51,7 +50,7 @@ internal class ShaderPipeline : AssetPipeline
             reflectionJson: reflectionJsonPath
             );
 
-        DxCompiler(hlslPath, shaderModel, context.GetOutputFilePath(".cso"), debugPath);
+        DxCompiler(hlslPath, shaderModel, context.GetOutputFilePath(".cso"));
 
         JsonDocument reflectionDocument = JsonDocument.Parse(File.ReadAllText(reflectionJsonPath));
         JsonElement reflection = reflectionDocument.RootElement;
@@ -210,7 +209,11 @@ internal class ShaderPipeline : AssetPipeline
             args.Add(output);
         }
 
-        if (debugInfo != null)
+        if (debugInfo == null)
+        {
+            args.AddRange(["-O3"]);
+        }
+        else
         {
             args.AddRange(["-Od", "-Gfp", "-Zi", "-Fd", debugInfo]);
         }

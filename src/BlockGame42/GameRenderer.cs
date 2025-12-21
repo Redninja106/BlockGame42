@@ -18,7 +18,7 @@ class GameRenderer(GraphicsContext graphics)
 
     public GUIViewport Viewport { get; } = new();
 
-    public void Render(Camera camera, World world)
+    public void Render(Camera camera, World world, PlayerEntity player)
     {
         graphics.RenderTargets.Clear(graphics.CommandBuffer);
 
@@ -38,7 +38,7 @@ class GameRenderer(GraphicsContext graphics)
         GUIRenderer.BeginFrame(graphics.Window.Width, graphics.Window.Height);
 
         DrawCrosshair();
-        // Game.player.Render();
+        player.Render(this);
 
         GUIRenderer.EndFrame();
     }

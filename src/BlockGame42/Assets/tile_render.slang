@@ -31,6 +31,7 @@ struct Uniforms
     uint phaseCount;
     uint tilesPerPhase;
     uint currentPhase;
+    uint frameCount;
 };
 
 SDL_FS_UNIFORM_BUFFER(0, Uniforms uniforms);
@@ -88,7 +89,7 @@ float4 main(float4 position : SV_Position) : SV_Target
         emission = 0;
     }
 
-    float reflectance = specular.g <= 229 ? specular.g : 0;
+    float3 reflectance = calc_reflectance(albedo, normal, specular, normalize(uniforms.cameraPosition.xyz - position));
 
     if (all(normal == 0))
     {
@@ -122,9 +123,11 @@ float4 main(float4 position : SV_Position) : SV_Target
 
         total_irradiance += float4(irradiance, float(accumulatedCount));
 
-        if (specular.w > 0 && i == uniforms.currentPhase)
+        if (any(reflectance > 0) && i == uniforms.currentPhase)
         {
-            uint4 packed_reflection = tileReflections[idx - i * uniforms.tilesPerPhase];
+            uint current_reflections_phase_offset = (uniforms.frameCount & 1) * uniforms.tilesPerPhase;
+
+            uint4 packed_reflection = tileReflections[idx - i * uniforms.tilesPerPhase + current_reflections_phase_offset];
             total_reflection.xyz = float3(packed_reflection.xyz) / 255.0;
             total_reflection.w = packed_reflection.w;
         }

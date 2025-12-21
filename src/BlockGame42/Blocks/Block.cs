@@ -20,6 +20,7 @@ abstract class Block : Prototype
     public Item Item { get; }
 
     public BlockStrength Strength { get; init; }
+    public bool Transparent { get; init; } = false;
 
     public Block()
     {

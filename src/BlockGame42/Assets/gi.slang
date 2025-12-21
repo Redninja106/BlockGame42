@@ -28,7 +28,6 @@ SDL_CS_RESOURCE(3, Texture2D<float4> positionTarget);
 SDL_CS_RESOURCE(4, Texture2D<float4> albedoTarget);
 SDL_CS_RESOURCE(5, Texture2D<float4> normalTarget);
 SDL_CS_RESOURCE(6, Texture2D<float4> specularTarget);
-// SDL_CS_RESOURCE(3, Texture2D<float4> prevPositionTarget);
 
 SDL_CS_RESOURCE(7, Texture3D<uint2> blockMasks);
 SDL_CS_RESOURCE(8, Texture3D<uint> materialIds);
@@ -41,11 +40,15 @@ struct Uniforms
 {
     float4 sundir;
     float4 cameraPosition;
+    float4 prevCameraPosition;
     int3 blockMasksOffset;
     uint tileOffset;
     uint tileCount;
     uint phaseCount;
     uint ticks;
+    uint frameCount;
+    uint currentPhase;
+    uint previousPhase;
 };
 
 SDL_CS_UNIFORM_BUFFER(0, Uniforms uniforms);
@@ -61,11 +64,19 @@ static uint ray_step_count = 0;
 [numthreads(16, 16, 1)]
 void main(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
+    uint2 size;
+    positionTarget.GetDimensions(size.x, size.y);
+
+    if (any(dispatchThreadID.xy >= size))
+    {
+        return;
+    }
+
     float4 pos_and_norm = positionTarget[dispatchThreadID.xy];
     float4 encoded_normal = normalTarget[dispatchThreadID.xy];
     float4 specular = specularTarget[dispatchThreadID.xy];
     // float4 prev_pos = prevPositionTarget[dispatchThreadID.xy];
-    // float4 albedo = specularTarget[dispatchThreadID.xy];
+    float4 albedo = specularTarget[dispatchThreadID.xy];
 
     float3 position = pos_and_norm.xyz;
     float3 original_normal = unpackSnorm4x8ToFloat(asuint(pos_and_norm.w)).xyz;
@@ -96,68 +107,66 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     }
     totalColor *= (1.0 / samples);
 
-    uint detail = hash_detail(position, uniforms.cameraPosition.xyz);
+    float detail = hash_detail(position, uniforms.cameraPosition.xyz);
     uint idx = find_or_insert(position, original_normal, detail);
+
+    float3 reflectance = calc_reflectance(albedo, normal, specular, normalize(uniforms.cameraPosition.xyz - position));
+    if (any(reflectance > 0))
+    {
+        float3 reflect_color = 0;
+
+        Ray reflection_ray;
+        reflection_ray.origin = position + normal * .0001;
+        float roughness = pow(1.0 - specular.r, 2.0);
+        float3 viewDir = normalize(position - uniforms.cameraPosition.xyz);
+        reflection_ray.direction = reflect(viewDir, normal) + random.NextUnitVector() * roughness;
+        reflection_ray.inverseDirection = 1 / reflection_ray.direction;
+        reflection_ray.length = 64;
+
+        float3 hit_pos;
+        reflect_color.xyz += reflection_color(reflection_ray, hit_pos);
+
+        float camera_distance = distance(position, uniforms.cameraPosition.xyz);
+        float hit_distance = distance(position, hit_pos);
+
+        uint current_reflections_phase_offset = ((uniforms.frameCount) & 1) * uniforms.tileCount;
+        uint prev_reflections_phase_offset = ((uniforms.frameCount + 1) & 1) * uniforms.tileCount;
+
+        float motion_factor = hit_distance / (hit_distance + camera_distance);
+
+        float3 motion = uniforms.cameraPosition.xyz - uniforms.prevCameraPosition.xyz;
+        uint phase = (uniforms.tileOffset / uniforms.tileCount - 1 + uniforms.phaseCount) % uniforms.phaseCount;
+        uint prev_idx = find(uniforms.previousPhase, position - motion * motion_factor * (1 - abs(original_normal)), original_normal, 16) - uniforms.previousPhase * uniforms.tileCount;
+        if (prev_idx != 0xFFFFFFFF) 
+        {
+            uint4 prev_reflection = tileReflections[prev_idx + prev_reflections_phase_offset];
+            if (prev_reflection.w > 0) 
+            {
+                float4 prev_reflection_color = float4(prev_reflection.xyz / 255.0, prev_reflection.w);
+                prev_reflection_color /= prev_reflection.w;
+
+                reflect_color = lerp(prev_reflection_color.xyz, reflect_color.xyz, 0.25);
+
+
+                // float w = .1;
+                // reflect_color = reflect_color.xyz * w + (1.0-w) * (prev_reflection_color.xyz);
+                // = (prev_reflection_color.xyz + reflect_color) / (prev_reflection_color.w + 1);
+                // reflect_color = lerp(reflect_color, prev_reflection_color.xyz / prev_reflection_color.w, 0.99);
+                // totalColor = prev_reflection_color.xyz / prev_reflection_color.w;
+                //totalColor = prev_reflection_color.xyz / prev_reflection_color.w;
+            }
+        }
+        uint reflect_idx = find(uniforms.currentPhase, position, original_normal, 16) - uniforms.currentPhase * uniforms.tileCount + current_reflections_phase_offset;
+        InterlockedAdd(tileReflections[reflect_idx].r, int(255 * reflect_color.r));
+        InterlockedAdd(tileReflections[reflect_idx].g, int(255 * reflect_color.g));
+        InterlockedAdd(tileReflections[reflect_idx].b, int(255 * reflect_color.b));
+        InterlockedAdd(tileReflections[reflect_idx].a, int(1));
+    } 
+    
     InterlockedAdd(tileIrradiances[idx].r, int(255 * totalColor.r));
     InterlockedAdd(tileIrradiances[idx].g, int(255 * totalColor.g));
     InterlockedAdd(tileIrradiances[idx].b, int(255 * totalColor.b));
     InterlockedAdd(tileIrradiances[idx].a, 1);
-
-    float reflection = specular.g <= 229 ? specular.g : 0;
-    if (reflection > 0.1)
-    {
-        const int reflect_ray_count = 1;
-
-        float3 reflect_color = 0;
-        for (int i = 0; i < reflect_ray_count; i++) 
-        {
-            Ray reflection_ray;
-            reflection_ray.origin = position + normal * .0001;
-            float roughness = pow(1.0 - specular.r, 2.0);
-            float3 viewDir = normalize(position - uniforms.cameraPosition.xyz);
-            reflection_ray.direction = reflect(viewDir, normal) + random.NextUnitVector() * roughness;
-            reflection_ray.inverseDirection = 1 / reflection_ray.direction;
-            reflection_ray.length = 64;
-
-            reflect_color = reflection_color(reflection_ray);
-        }
-
-        // float3 motion = position - prev_pos.xyz;
-        // float prev_idx = find(0, position - motion * .5, original_normal, detail);
-
-        InterlockedAdd(tileReflections[idx - uniforms.tileOffset].r, int(255 * reflect_color.r));
-        InterlockedAdd(tileReflections[idx - uniforms.tileOffset].g, int(255 * reflect_color.g));
-        InterlockedAdd(tileReflections[idx - uniforms.tileOffset].b, int(255 * reflect_color.b));
-        InterlockedAdd(tileReflections[idx - uniforms.tileOffset].a, reflect_ray_count);
-    }
-}
-
-static const float3 TURBO[16] = {
-    float3(0.18995, 0.07176, 0.23217),
-    float3(0.25107, 0.25237, 0.63374),
-    float3(0.27628, 0.42118, 0.89123),
-    float3(0.25862, 0.57230, 0.97711),
-    float3(0.21603, 0.70670, 0.90068),
-    float3(0.17895, 0.82095, 0.74684),
-    float3(0.27059, 0.90909, 0.51912),
-    float3(0.46920, 0.96773, 0.32103),
-    float3(0.67579, 0.98821, 0.21008),
-    float3(0.85144, 0.94188, 0.18409),
-    float3(0.96359, 0.84317, 0.23270),
-    float3(0.99675, 0.70259, 0.34699),
-    float3(0.95547, 0.53393, 0.47156),
-    float3(0.85907, 0.35018, 0.58910),
-    float3(0.72161, 0.19110, 0.63536),
-    float3(0.47960, 0.01583, 0.57066)
-}; 
-
-float3 SampleTurbo(float t)
-{
-    t = saturate(t);
-    float x = t * 15.0;
-    int i = (int)x;
-    float f = frac(x);
-    return lerp(TURBO[i], TURBO[min(i + 1, 15)], f);
 }
 
 uint find_or_insert(float3 position, float3 normal, float detail)
@@ -192,7 +201,7 @@ float3 ray_color(Ray ray, float3 normal)
     int3 hitVoxel;
 
     float3 sky_light = 0;
-    float3 albedo[MaxBounces];
+    float4 albedo[MaxBounces];
     float4 specular[MaxBounces];
     for (int i = 0; i < MaxBounces; i++)
     {
@@ -200,38 +209,19 @@ float3 ray_color(Ray ray, float3 normal)
         specular[i] = 0;
     }
 
-
     for (int i = 0; i < MaxBounces; i++)
     {
-        if (dda(ray, hitT, hitNormal, hitVoxel))
+        float3 worldNormal;
+        if (hit_world(ray, hitT, hitNormal, hitVoxel, albedo[i], specular[i], worldNormal))
         {
-            uint texId = materialIds[hitVoxel + uniforms.blockMasksOffset];
-            // MaterialData material = materials[materialIds[hitVoxel + uniforms.blockMasksOffset]];
-            // return hitNormal * .5 + .5;
-            float3 hitPos = ray.origin + ray.direction * hitT;
-
-            float2 uv = calc_face_uv(frac(hitPos), hitNormal);
-            float3 uvw = float3(uv, texId);
-
-            albedo[i] = albedoTextureArray.SampleLevel(sampler, uvw, 0).xyz;
-            specular[i] = specularTextureArray.SampleLevel(sampler, uvw, 0);
-            
-            float3x3 tbn = calc_face_tbn_matrix(hitNormal);
-            float4 sampledNormal = normalTextureArray.SampleLevel(sampler, uvw, 0);
-            float3 n = decode_normal(sampledNormal.xy);
-            float3 worldNormal = normalize(mul(tbn, n));
-            // transmission[i] = materialTextures.SampleLevel(sampler, float3(uv, material.transmissions[0]), 0).xyz;
-
-            ray.origin = hitPos + hitNormal * 0.001;
+            ray.origin = ray.at(hitT) + hitNormal * 0.001;
             ray.direction = normalize(worldNormal + random.NextUnitVector());
             ray.inverseDirection = 1 / ray.direction;
         }
         else
         {
             const float skystrength = .1;
-
-            // sky emission
-            sky_light += skystrength; // + 0.5 * float3(.392f, .584f, .929f);
+            sky_light += skystrength;
             break;
         }
     }
@@ -263,20 +253,57 @@ float3 ray_color(Ray ray, float3 normal)
             emission = 0;
         }
 
-        color = albedo[j] * (color + emission * emissionStrength);
+        color = albedo[j].xyz * (color + emission * emissionStrength);
     }
     return color + sky_light;
 }
 
-float3 reflection_color(Ray ray)
+bool hit_world(Ray ray, out float outT, out float3 outHitNormal, out int3 outVoxel, out float4 albedo, out float4 specular, out float3 worldNormal)
+{
+    constexpr int max_rebounces = 3;
+
+    for (int i = 0; i < max_rebounces; i++)
+    {
+        if (dda(ray, outT, outHitNormal, outVoxel))
+        {
+            uint material = materialIds[outVoxel + uniforms.blockMasksOffset];
+            float3 hit_pos = ray.at(outT);
+            float2 uv = calc_face_uv(hit_pos, outHitNormal);
+
+            albedo = albedoTextureArray.SampleLevel(sampler, float3(uv, material), 0);
+            specular = specularTextureArray.SampleLevel(sampler, float3(uv, material), 0);
+            // normal = normalTextureArray.SampleLevel(sampler, float3(uv, material), 0);
+
+            float3x3 tbn = calc_face_tbn_matrix(outHitNormal);
+            float4 sampledNormal = normalTextureArray.SampleLevel(sampler, float3(uv, material), 0);
+            float3 n = decode_normal(sampledNormal.xy);
+            worldNormal = normalize(mul(tbn, n));
+
+            if (albedo.a == 0)
+            {
+                ray.origin = hit_pos;
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    return false;
+}
+
+
+float3 reflection_color(Ray ray, out float3 hitPos)
 {
     float hitT;
     float3 hitNormal;
     int3 hitVoxel;
 
-    float3 hitPos;
     if (!dda(ray, hitT, hitNormal, hitVoxel))
     {
+        hitPos = ray.direction * 10000;
         const float skystrength = .15;
         return skystrength;
     }

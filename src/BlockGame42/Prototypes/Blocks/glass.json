@@ -1,6 +1,7 @@
 {
   "Prototype": "SolidBlock",
   "Name": "glass",
+  "Transparent": true,
   "Model": {
     "Prototype": "SolidBlockModel",
     "Material": {

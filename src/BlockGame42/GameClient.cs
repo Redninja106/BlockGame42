@@ -13,6 +13,7 @@ using BlockGame42.Rendering;
 using Protor;
 using SDL;
 using SDL.GPU;
+using SDL.Native;
 
 namespace BlockGame42;
 
@@ -177,7 +178,7 @@ class GameClient : Application
 
         if (Graphics.BeginFrame())
         {
-            Renderer.Render(Interaction.Player.Camera, World);
+            Renderer.Render(Interaction.Player.Camera, World, Interaction.Player);
             Graphics.EndFrame();
         }
 
@@ -199,6 +200,16 @@ class GameClient : Application
         //pass.End();
 
         //commandBuffer.Submit();
+    }
+
+    protected override void OnEvent(in SDL_Event ev)
+    {
+        base.OnEvent(ev);
+
+        if (ev.type == (uint)SDL_EventType.SDL_EVENT_MOUSE_WHEEL)
+        {
+            Interaction.Player.OnScroll(ev.wheel);
+        }
     }
 }
 

@@ -49,7 +49,7 @@ internal class TileLookupManager
 
         tileReflections = graphics.device.CreateDataBuffer(
             DataBufferUsageFlags.GraphicsStorageRead | DataBufferUsageFlags.ComputeStorageWrite,
-            tilesPerPhase * 4 * sizeof(int)
+            2 * tilesPerPhase * 4 * sizeof(int)
             );
 
         Console.WriteLine($"tile lookup: {checksums.Size >> 20}MB checksums, {tileIrradiances.Size >> 20}MB irradiances, {tileReflections.Size >> 20}MB reflections");
@@ -95,8 +95,8 @@ internal class TileLookupManager
         }
     }
 
-    public void ClearReflections()
+    public void ClearReflections(int reflectionsPhase)
     {
-        graphics.ClearDataBufferRange(tileReflections, 0, tileReflections.Size, false);
+        graphics.ClearDataBufferRange(tileReflections, PayloadPhaseSizeInBytes * (uint)reflectionsPhase, PayloadPhaseSizeInBytes, false);
     }
 }

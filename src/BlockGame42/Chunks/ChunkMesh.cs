@@ -137,18 +137,22 @@ internal class ChunkMesh
             return;
         }
 
-        BlockFaceMask faceMask = block.Prototype.Model.GetFaceMask(block.State, direction);
-        BlockFaceMask neighborMask = neighborBlock.Prototype.Model.GetFaceMask(neighborBlock.State, inverseDirection);
-        if ((int)direction < 4)
+        BlockFaceMask visibleFaces = BlockFaceMask.Full;
+        if (block.Prototype.Transparent != neighborBlock.Prototype.Transparent)
         {
-            neighborMask = FlipMaskHorizontal(neighborMask);
-        }
+            BlockFaceMask faceMask = block.Prototype.Model.GetFaceMask(block.State, direction);
+            BlockFaceMask neighborMask = neighborBlock.Prototype.Model.GetFaceMask(neighborBlock.State, inverseDirection);
+            if ((int)direction < 4)
+            {
+                neighborMask = FlipMaskHorizontal(neighborMask);
+            }
 
-        BlockFaceMask visibleFaces = faceMask & ~neighborMask;
+            visibleFaces = faceMask & ~neighborMask;
 
-        if (visibleFaces == 0)
-        {
-            return;
+            if (visibleFaces == 0)
+            {
+                return;
+            }
         }
 
         Coordinates offset = faceOffsets[(int)direction];
@@ -318,95 +322,7 @@ ref struct BlockMeshBuilder
 
             vertices.AddRange(v0, v2, v1, v0, v3, v2);
         }
-
-
-
-        //for (int y = 0; y < 4; y++)
-        //{
-        //    for (int x = 0; x < 4; x++)
-        //    {
-        //        BlockFaceMask currentFace = (BlockFaceMask)(1 << (y * 4 + x));
-        //        if ((remainingFace & currentFace) != 0)
-        //        {
-        //            float ul = x * .25f;
-        //            float vl = y * .25f;
-        //            float uh = (x + 1) * .25f;
-        //            float vh = (y + 1) * .25f;
-
-        //            for (int i = x + 1; i < 4; i++)
-        //            {
-        //                BlockFaceMask nextFace = (BlockFaceMask)(1 << (y * 4 + i));
-        //                if ((remainingFace & nextFace) != 0)
-        //                {
-        //                    currentFace |= nextFace;
-        //                    remainingFace &= ~nextFace;
-
-        //                    uh += .25f;
-        //                    x++;
-        //                }
-        //                else
-        //                {
-        //                    break;
-        //                }
-        //            }
-
-        //            for (int i = y + 1; i < 4; i++)
-        //            {
-        //                BlockFaceMask nextRow = (BlockFaceMask)(0xF << y * 4);
-        //                if ((mask & currentFace) != 0)
-        //                {
-        //                    currentFace |= nextFace;
-        //                    vh += .25f;
-        //                    y++;
-        //                }
-        //                else
-        //                {
-        //                    break;
-        //                }
-        //            }
-
-        //            MinimizedChunkVertex v0 = new((coordinates + offset).ToVector() + ul * right + vl * up, new(ul, vl), blockTextureId, new Vector4(ao));
-        //            MinimizedChunkVertex v1 = new((coordinates + offset).ToVector() + uh * right + vl * up, new(uh, vl), blockTextureId, new Vector4(ao));
-        //            MinimizedChunkVertex v2 = new((coordinates + offset).ToVector() + uh * right + vh * up, new(uh, vh), blockTextureId, new Vector4(ao));
-        //            MinimizedChunkVertex v3 = new((coordinates + offset).ToVector() + ul * right + vh * up, new(ul, vh), blockTextureId, new Vector4(ao));
-
-        //            vertices.AddRange(v0, v2, v1, v0, v3, v2);
-        //        }
-        //    }
-        //}
     }
-
-    //public void AppendPartialBlockFace(Coordinates offset, Vector3 right, Vector3 up, Vector3 forward, uint blockTextureId, float ao)
-    //{
-    //    // float ao0 = CalculateAO(neighborhood, coordinates, right, up, normal);
-    //    // float ao1 = CalculateAO(neighborhood, coordinates + right, right, up, normal);
-    //    // float ao2 = CalculateAO(neighborhood, coordinates + right + up, right, up, normal);
-    //    // float ao3 = CalculateAO(neighborhood, coordinates + up, right, up, normal);
-    //    // Vector4 aov = new Vector4(ao0, ao1, ao3, ao2);
-
-    //    for (int y = 0; y < 4; y++)
-    //    {
-    //        for (int x = 0; x < 4; x++)
-    //        {
-    //            BlockFaceMask m = (BlockFaceMask)(1 << (y * 4 + x));
-    //            if ((faceMask & m) != 0)
-    //            {
-    //                float ul = x * .25f;
-    //                float uh = (x + 1) * .25f;
-    //                float vl = y * .25f;
-    //                float vh = (y + 1) * .25f;
-
-    //                MinimizedChunkVertex v0 = new((coordinates + faceOffset).ToVector() + ul * right.ToVector() + vl * up.ToVector(), new(ul, vl), blockTextureId, aov);
-    //                MinimizedChunkVertex v1 = new((coordinates + faceOffset).ToVector() + uh * right.ToVector() + vl * up.ToVector(), new(uh, vl), blockTextureId, aov);
-    //                MinimizedChunkVertex v2 = new((coordinates + faceOffset).ToVector() + uh * right.ToVector() + vh * up.ToVector(), new(uh, vh), blockTextureId, aov);
-    //                MinimizedChunkVertex v3 = new((coordinates + faceOffset).ToVector() + ul * right.ToVector() + vh * up.ToVector(), new(ul, vh), blockTextureId, aov);
-
-    //                vertices.AddRange(v0, v2, v1, v0, v3, v2);
-    //            }
-    //        }
-    //    }
-
-    //}
 
     public void AppendBlockFace(Coordinates offset, Coordinates right, Coordinates up, Coordinates normal, uint blockTextureId)
     {
@@ -416,46 +332,5 @@ ref struct BlockMeshBuilder
         MinimizedChunkVertex v3 = new((coordinates + offset + up).ToVector(), new(0, 1), blockTextureId, default, normal.ToVector());
 
         vertices.AddRange(v0, v2, v1, v0, v3, v2);
-    }
-
-    private float CalculateAO(ChunkNeighborhood neighborhood, Coordinates coordinates, Coordinates right, Coordinates up, Coordinates normal)
-    {
-        // TODO: better ao algo
-
-        if (neighborhood.At(coordinates + normal - right, out var offset)?.GetModel(offset) is SolidBlockModel)
-        {
-            return 0;
-        }
-        if (neighborhood.At(coordinates + normal - up, out offset)?.GetModel(offset) is SolidBlockModel)
-        {
-            return 0;
-        }
-        if (neighborhood.At(coordinates + normal - right - up, out offset)?.GetModel(offset) is SolidBlockModel)
-        {
-            return 0;
-        }
-        if (neighborhood.At(coordinates + normal, out offset)?.GetModel(offset) is SolidBlockModel)
-        {
-            return 0;
-        }
-
-        return 1;
-    }
-}
-
-static class DirectionExtensions
-{
-    public static Direction Inverse(this Direction direction)
-    {
-        return direction switch
-        {
-            Direction.East => Direction.West,
-            Direction.South => Direction.North,
-            Direction.West => Direction.East,
-            Direction.North => Direction.South,
-            Direction.Up => Direction.Down,
-            Direction.Down => Direction.Up,
-            _ => default
-        };
     }
 }

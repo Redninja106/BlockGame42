@@ -1,0 +1,3 @@
+[submodule "dependencies/SDLdotnet"]
+	path = dependencies/SDLdotnet
+	url = https://github.com/Redninja106/SDLdotnet

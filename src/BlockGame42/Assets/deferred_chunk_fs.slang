@@ -69,9 +69,19 @@ FsOut main(FsIn i)
     float3 tangent_camera_position = mul(tbn, cameraPosition);
     float3 tangent_view_dir = normalize(tangent_world_position - tangent_camera_position);
     float3 parallax_uv = ParallaxMapping(i.textureCoordinates.xyz, tangent_view_dir, parallax_ao);
-    
+
+    //if (any(parallax_uv.xy < 0) || any(parallax_uv.xy > 1))
+    //{
+    //    discard;
+    //}
+
     o.specular = specularTextureArray.Sample(sampler, parallax_uv);
     o.albedo = albedoTextureArray.Sample(sampler, parallax_uv);
+
+    if (o.albedo.a == 0)
+    {
+        discard;
+    }
 
     float4 encoded_normal = normalTextureArray.Sample(sampler, parallax_uv);
     float3 normal = decode_normal(encoded_normal.xy);

@@ -1,6 +1,7 @@
 ﻿using BlockGame42.Blocks;
 using BlockGame42.Chunks;
 using Protor;
+using SDL.Native;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -121,38 +122,51 @@ internal class PlayerEntity : Entity
 
         if ((mouseButtons & MouseButtonFlags.Middle) != 0 && (lastMouseButtons & MouseButtonFlags.Middle) == 0)
         {
-            placementIdx++;
-            placementIdx %= placementArray.Length;
+            
         }
 
         if (keyboard[Scancode.E] && !(lastKeyboardState?[(int)Scancode.E] ?? false))
         {
             placementIdx++;
-            placementIdx %= placementArray.Length;
+            placementIdx %= blocks.Length;
         }
 
         if ((mouseButtons & MouseButtonFlags.Left) != 0 && (lastMouseButtons & MouseButtonFlags.Left) == 0)
         {
-            Block placingBlock = placementArray[placementIdx];
+            Block placingBlock = blocks[placementIdx];
             placingBlock.PlacementHandler.OnPlaceBlock(World, Camera, placingBlock);
         }
-        
+        showblocks = keyboard[Scancode.Tab];
         lastMouseButtons = mouseButtons;
         lastKeyboardState = keyboard.ToArray();
+
     }
 
-    string[] nameArray = ["stone", "glowstone", "dirt", "iron block", "player", "redstone lamp on"];
-    Block[] placementArray = [BlockRegistry.Stone, BlockRegistry.Glowstone, BlockRegistry.Dirt, BlockRegistry.IronBlock, Registry.Get<Block>("redstone_lamp_on")];
-    int placementIdx = 0;
+    Block[] blocks = Registry.GetAll<Block>();
+    public int placementIdx = 0;
+    bool showblocks;
+
+    public void OnScroll(SDL_MouseWheelEvent ev)
+    {
+        placementIdx -= ev.integer_y;
+        placementIdx = ((placementIdx % blocks.Length) + blocks.Length) % blocks.Length;
+    }
 
     public void Render(GameRenderer renderer)
     {
         Ray ray = new(Camera.transform.Position, Camera.transform.Forward, 100);
-        renderer.GUIRenderer.PushText(renderer.Font, nameArray[placementIdx], new(5,30), 0xFFFFFFFF);
-        
+        if (showblocks)
+        {
+            for (int i = 0; i < blocks.Length; i++)
+            {
+                Block block = blocks[i];
+                renderer.GUIRenderer.PushText(renderer.Font, block.Name, new(5+2, 30 + i * 30 + 2), i == placementIdx ? 0xFF000000 : 0x44000000);
+                renderer.GUIRenderer.PushText(renderer.Font, block.Name, new(5, 30 + i * 30), i == placementIdx ? 0xFFFFFFFF : 0x44444444);
+            }
+        }
         if (World.Raycast(ray, out float t, out Coordinates hitCoords, out Coordinates normal))
         {
-            renderer.GUIRenderer.PushText(renderer.Font, World.GetBlockReference(hitCoords).Support.ToString(), new(renderer.Graphics.Window.Width/2f, renderer.Graphics.Window.Height/2f), 0xFFFFFFFF);
+            // renderer.GUIRenderer.PushText(renderer.Font, World.GetBlockReference(hitCoords).Support.ToString(), new(renderer.Graphics.Window.Width/2f, renderer.Graphics.Window.Height/2f), 0xFFFFFFFF);
         }
     }
 
